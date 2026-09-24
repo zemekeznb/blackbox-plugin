@@ -2,6 +2,8 @@
 
 独立轻量产品：Codex + Windows + 本地工作记录 + Owner 人工审阅。
 
+私有源码仓库：[zemekeznb/tas-notes](https://github.com/zemekeznb/tas-notes)。
+
 用户于 2026-09-24 明确选择先实现、再通过实际使用验证价值。竞品存在是方向信号，不等于已验证本产品需求。
 
 ## 与旧 TAS 的划分
