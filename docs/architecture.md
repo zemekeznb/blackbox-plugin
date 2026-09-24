@@ -34,6 +34,6 @@ Codex 插件（可用 Hook / Skill）→ 本地受限事件入口 → SQLite 事
 
 ## 验证与迭代
 
-当前结果见 [接入证据](integration-evidence.md)；真实安装与触发的下一入口为 [NOTES-002](tasks/NOTES-002.md)。
+当前结果见 [接入证据](integration-evidence.md)；[NOTES-002](tasks/NOTES-002.md) 已完成受控本机真实接入验证，下一入口 [NOTES-004](tasks/NOTES-004.md) 是采集诊断与真实使用准备。
 
 NOTES-001 先完成插件与本地最小流程、契约和恢复测试。真实宿主安装与自动触发独立记录；文档网页、CLI schema、合成测试各自只能证明其范围。之后再增加有来源约束的模型整理、跨会话关联和真实使用评估。

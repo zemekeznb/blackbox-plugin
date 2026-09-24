@@ -274,6 +274,14 @@ def render_draft(record):
     for event in record['events']:
         parts.append(f"### 事件 {event['seq']} · {event['kind']}\n\n采集时间：{event['captured']}")
         content = json.loads(event['content'])
+        if event['kind'] == 'PostToolUse':
+            parts.append('**结果覆盖：本版未提取结构化退出状态，操作是否成功未知；请核对工具返回与外部证据。**')
+            if not any(content.get(key) not in (None, '', {}, []) for key in ('tool_response', 'tool_result')):
+                parts.append('**工具返回缺失或为空，不能据此判断成功。**')
+        if event['kind'] in ('PreCompact', 'PostCompact', 'Interrupt') and not any(key in content for key in FIELDS):
+            parts.append('仅捕获到事件发生；本条没有可用的正文或原因。')
+        if '\ufffd' in canonical(content):
+            parts.append('**材料含替换字符（�），可能已发生编码丢失；保留原样，不猜测还原。**')
         for key in FIELDS:
             if key not in content:
                 continue

@@ -1,6 +1,7 @@
 """Read-only runtime probe. Never starts a turn or changes hook trust."""
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 import queue
@@ -11,11 +12,21 @@ import time
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--installed', action='store_true')
+    parser.add_argument('--cwd', type=Path)
+    args = parser.parse_args()
+    if args.cwd and not args.installed:
+        parser.error('--cwd requires --installed; never write hook fixtures into a selected project')
     root = (Path(__file__).resolve().parents[1] / '.cache' / 'probe-workspace').resolve()
+    if args.cwd:
+        root = args.cwd.resolve()
     project_root = Path(__file__).resolve().parents[1]
-    config = root / '.codex' / 'hooks.json'
-    config.parent.mkdir(parents=True, exist_ok=True)
-    config.write_bytes((project_root / 'plugins' / 'tas-notes' / 'hooks' / 'hooks.json').read_bytes())
+    root.mkdir(parents=True, exist_ok=True)
+    if not args.installed:
+        config = root / '.codex' / 'hooks.json'
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_bytes((project_root / 'plugins' / 'tas-notes' / 'hooks' / 'hooks.json').read_bytes())
     process = subprocess.Popen(
         [shutil.which('codex') or 'codex', 'app-server', '--stdio', '-c', 'features.hooks=true'],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -65,9 +76,10 @@ def main() -> None:
         for entry in result.get('data', []):
             output['entries'].append({
                 'errors': entry.get('errors', []),
-                'hooks': [{key: hook.get(key) for key in ('eventName', 'handlerType', 'timeoutSec', 'source', 'trustStatus')}
+                'hooks': [{key: hook.get(key) for key in ('eventName', 'handlerType', 'timeoutSec', 'source', 'trustStatus', 'command', 'pluginId', 'enabled')}
                           for hook in entry.get('hooks', [])
-                          if str(root).lower() in hook.get('sourcePath', '').lower()],
+                          if (args.installed and (hook.get('pluginId') or '').startswith('tas-notes@'))
+                          or (not args.installed and str(root).lower() in hook.get('sourcePath', '').lower())],
             })
         send({'id': 3, 'method': 'plugin/read', 'params': {
             'marketplacePath': str(project_root / '.agents' / 'plugins' / 'marketplace.json'),

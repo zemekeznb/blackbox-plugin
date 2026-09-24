@@ -102,6 +102,22 @@ class StoreTests(unittest.TestCase):
         self.assertFalse(content['_coverage']['transcript_read'])
         self.assertNotIn('transcript_path', content)
 
+    def test_real_host_coverage_gaps_stay_unknown(self):
+        event = self.event(tool_input={'command': 'cmd.exe /d /c exit 7'})
+        event['tool_response'] = ''
+        identifier = self.store.record(event)['investigation']
+        detail = self.store.detail(identifier)
+        self.assertIn('未提取结构化退出状态', detail['draft'])
+        self.assertIn('工具返回缺失或为空', detail['draft'])
+        # Rendering warnings must not fabricate or rewrite the stored host result.
+        self.assertEqual(json.loads(detail['events'][0]['content'])['tool_response'], '')
+        event.update(tool_use_id='tool-2', tool_response='Synthetic: \ufffd content.')
+        self.store.record(event)
+        self.store.record(dict(cwd=str(self.project), session_id='session-1', hook_event_name='Interrupt'))
+        draft = self.store.detail(identifier)['draft']
+        self.assertIn('可能已发生编码丢失', draft)
+        self.assertIn('本条没有可用的正文或原因', draft)
+
     def test_invalid_input_shapes_do_not_write(self):
         for changes in ({'hook_event_name': []}, {'hook_event_name': 'Unknown'},
                         {'session_id': None}, {'thread_id': 'different'},
