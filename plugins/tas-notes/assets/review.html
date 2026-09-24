@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TAS Notes · 本地审阅</title>
+  <link rel="stylesheet" href="/review.css"><script src="/review.js" defer></script>
+</head>
+<body>
+  <header><div class="brand">TAS Notes <span>本地审阅 · 原型</span></div><p>工作经过留在本机，由你决定如何整理和分享。</p></header>
+  <main>
+    <aside aria-label="调查记录">
+      <h1>调查记录</h1>
+      <label for="query">查找标题或项目</label>
+      <div class="search"><input id="query" type="search"><button id="search">查找</button></div>
+      <p class="muted">最多显示最近 500 条；列表不会自动刷新，避免打断编辑。</p>
+      <button id="refresh">刷新列表</button><div id="records"></div>
+    </aside>
+    <section aria-label="记录详情">
+      <p id="status" role="status" aria-live="polite">正在连接本地记录…</p>
+      <div id="empty"><h2>从左侧选择一份记录</h2><p>仅显示已启用项目的本地材料。自动草稿与人工版本分开保存。</p></div>
+      <div id="detail" hidden>
+        <h2 id="record-heading">调查记录</h2><p id="meta" class="muted"></p>
+        <p class="notice">回合结束不代表问题解决。保存人工版本也不表示验收通过或已发布。</p>
+        <details><summary>查看自动生成的过程草稿</summary><pre id="draft"></pre></details>
+        <details><summary>查看捕获的事件与来源</summary><div id="events"></div></details>
+        <label for="title">人工版本标题</label><input id="title" maxlength="200">
+        <label for="body">审阅与编辑（Markdown）</label><textarea id="body" rows="20" maxlength="200000"></textarea>
+        <div class="actions"><button id="save" class="primary">保存人工版本</button><button id="export" disabled>下载已保存版本</button></div>
+        <p class="muted">下载仅包含上次保存的人工版本。新增事件和未保存的编辑不会被悄悄加入。</p>
+      </div>
+    </section>
+  </main>
+  <footer>无 TAS 云端上传 · 无额外模型调用 · 不自动提交或推送 Git · 来源缺失与采集间隙仍可能存在</footer>
+</body>
+</html>

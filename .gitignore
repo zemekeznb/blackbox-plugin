@@ -1,0 +1,9 @@
+.local/
+.cache/
+__pycache__/
+.pytest_cache/
+*.db
+*.sqlite*
+*.egg-info/
+dist/
+build/

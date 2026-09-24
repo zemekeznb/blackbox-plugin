@@ -1,0 +1,18 @@
+{
+  "name": "tas-notes",
+  "version": "0.1.0",
+  "description": "Local Codex investigation records with versioned human review. Experimental Windows hooks.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "TAS Notes",
+    "shortDescription": "Local investigation records and human review.",
+    "longDescription": "Capture opted-in project events locally, inspect source materials, edit human versions, and export Markdown. Windows hook integration is experimental.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Open my local TAS Notes records for review."
+  }
+}

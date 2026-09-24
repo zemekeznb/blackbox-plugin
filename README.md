@@ -1,0 +1,117 @@
+# TAS Notes
+
+独立轻量产品：Codex + Windows + 本地工作记录 + Owner 人工审阅。
+
+用户于 2026-09-24 明确选择先实现、再通过实际使用验证价值。竞品存在是方向信号，不等于已验证本产品需求。
+
+## 与旧 TAS 的划分
+
+| 路线 | 位置 | 状态 |
+| --- | --- | --- |
+| 完整 Team Agent System | 父目录 `tas/`、`tests/`、`clients/`、根目录历史文档 | 保留 F2 Completed / F3 Not Ready；本次不继续中央平台开发 |
+| TAS Notes | 本目录全部内容 | NOTES-001 本地核心已验证；NOTES-002 真实宿主接入待验证 |
+
+以上位置描述源项目中的划分。独立仓库只包含本目录的快照，不携带旧 TAS 代码或历史；旧项目仍保留。用户已于 2026-09-24 要求新建私有仓库，见 NOTES-003。
+
+## 入口
+
+- [设计与范围](docs/architecture.md)
+- [路线决定](docs/decisions/ADR-N001-codex-windows-local-plugin.md)
+- [首个工程任务](docs/tasks/NOTES-001.md)
+
+## 现在能做什么
+
+- 按项目选择是否记录；已接收的事件持久保存在本机 SQLite。
+- 查看详细过程草稿和来源，包括失败尝试、Agent 最后陈述与用户后来反馈。
+- 在本地网页编辑和保存人工版本；新事件不会覆盖人工文字。
+- 导出选定人工版本为 Markdown，由用户沿现有渠道分享。
+- 插件包含 Hook 配置和操作 Skill，本机 Codex `plugin/read` 已识别它们。
+
+**这仍是开发原型。真实 Codex 自动触发尚未验收，不能宣称安装即用。** 首个切片不调用额外模型，自动草稿只是有来源的过程编排，不是自动总结完整理由。见 [接入证据](docs/integration-evidence.md)。
+
+## 目录
+
+```text
+tas-notes/
+  .agents/plugins/marketplace.json  独立分发入口
+  plugins/tas-notes/                完整插件包
+    .codex-plugin/plugin.json
+    hooks/                         自动事件配置（实验）
+    skills/                        设置与审阅操作入口
+    scripts/                       本地记录、启动器与 HTTP 服务
+    assets/                        审阅网页
+  tests/                           独立测试
+  tools/                           合成演示与只读宿主探测
+  docs/                            设计、ADR、Task 与证据
+```
+
+## 先体验本地审阅
+
+在本仓库根目录打开 PowerShell。下例假设 Python 3.10+ 可通过 `python` 运行；否则把它替换为你的 Python 绝对路径。源工作区开发时可使用 `C:\example\project\.venv\Scripts\python.exe`，这不是插件发行依赖。
+
+```powershell
+python '.\tools\demo.py'
+```
+
+打开终端打印的完整本地链接。演示只使用明确标注的合成材料，状态在被 Git 忽略的 `.cache/demo-state/`，不会为真实项目启用记录。按 Ctrl+C 停止页面服务。要演示“后来发现仍有问题”，另开终端运行：
+
+```powershell
+python '.\tools\demo.py' --add-correction
+```
+
+重新打开记录会看到新增材料提示，之前保存的人工版本仍保留。演示不是自动采集证据。
+
+## 实验安装与运行
+
+需要 Windows、Python 3.10+ 和支持插件 Hooks 的 Codex。当前探测版本为 `0.155.0-alpha.16`；尚未确认其他版本兼容性。无需 npm、Docker、旧 TAS 服务或第三方 Python 包。
+
+本目录是非默认 marketplace，目前只在工作区创建，没有注册或安装到你的 Codex。计划中的本地安装命令如下；先检查 `codex plugin marketplace list` 是否已有同名 `personal`，冲突时先调整发行名称，不覆盖既有目录：
+
+```powershell
+codex plugin marketplace add .
+codex plugin add tas-notes@personal
+```
+
+GitHub 分发应把本目录作为独立仓库根，保留 `.agents/plugins/marketplace.json` 和 `plugins/`，然后通过该仓库注册 marketplace。不能把任意 GitHub 链接都当作可安装插件。私有仓库创建与上传状态记录在 NOTES-003；未经另行授权不公开发布。
+
+本地手动运行方式（从本目录执行）：
+
+```powershell
+$notesPython = (Get-Command python -ErrorAction Stop).Source
+$notesEntry = (Resolve-Path '.\plugins\tas-notes\scripts\tas_notes.py').Path
+& $notesPython $notesEntry configure-runtime
+# 用你明确选择的项目绝对路径替换下一行示例。
+& $notesPython $notesEntry enable 'C:\example\project'
+& $notesPython $notesEntry status
+& $notesPython $notesEntry serve
+# 停止后续采集；已有记录不会被删除。
+& $notesPython $notesEntry disable 'C:\example\project'
+```
+
+`configure-runtime` 只配置本地 Python 启动路径。仍需在 Codex 的正常流程中启用并信任插件 Hooks；这些步骤不会被命令代办。最终的变量展开、触发行为和真实输入字段待 NOTES-002 验证。
+
+默认数据位于 `%LOCALAPPDATA%/TAS Notes/`，不能放在正在记录的项目内部；测试可通过 `--state-dir` 或 `TAS_NOTES_STATE_DIR` 选择隔离目录。Hook 启动器读取同目录的 `runtime.cmd`，无需改变 PowerShell 执行策略。Python 可执行文件需有 ASCII 路径或可用的 Windows 短路径；安装及状态路径含 `%` 暂不支持。
+
+## 记录和隐私边界
+
+- 启用范围按 Hook 的 `cwd` 精确匹配，不自动涵盖子目录、其他 worktree 或项目。
+- 已启用项目的纯问答也会记录可取得的输入；首版没有“是否值得记录”的语义筛选。
+- 不扫描会话文件、不采集隐藏推理。尚未送达的事件、异常中断前未落盘的数据、缺失的宿主字段不能恢复。
+- 保留字段白名单，有限遮蔽敏感键和 Bearer 串；不是全面脱敏。正文仍可能含秘密，导出前需人工检查。
+- 数据是当前系统用户可读的本地明文，没有应用级加密、多用户隔离。项目外存储降低误提交风险，不阻止备份软件同步。
+- “本地”指本插件的存储和审阅；不改变 Codex 原有模型的数据流。
+- 有稳定事件 ID 时幂等；无稳定 ID 时保留重复投递，以免误丢真实重复操作。
+- Hook 返回码不会因采集失败阻断任务；`status` 显示最近一次安全错误标记。该历史标记不代表当前仍失败，也不能发现宿主根本没投递事件。
+- 单输入 512 KiB，单字段 32K 字符截断并标注，单会话约 10 MiB / 5000 事件上限。数据库约 256 MiB 停止新增检查不是严格磁盘配额。暂无保留期限、自动清理、备份和导入恢复。
+- 审阅页面按需启动，监听 127.0.0.1 随机端口，使用临时访问令牌，无云端上传。关闭页面服务不会停止独立 Hook 采集。它不是公网 Web 服务。
+
+## 开发验证
+
+从本目录运行：
+
+```powershell
+python -m unittest discover -s tests -v
+python '.\tools\probe_codex_hooks.py'
+```
+
+探测程序只请求本机 app-server 的初始化、`hooks/list` 和 `plugin/read`，结束即退出；不启动模型回合或改变信任。若沙箱不能访问 Codex 运行目录，应在获准的正常终端执行，不通过修改全局策略解决。
