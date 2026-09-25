@@ -135,7 +135,9 @@ class Rpc:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', action='store_true', required=True)
-    parser.add_argument('--phase', choices=('smoke', 'flow', 'lifecycle', 'exit'), default='smoke')
+    parser.add_argument('--phase', choices=('smoke', 'flow', 'lifecycle', 'exit', 'shape'), default='smoke')
+    parser.add_argument('--inspect-hook-shape', action='store_true',
+                        help='Record PostToolUse field names/types in the synthetic test state, never values')
     args = parser.parse_args()
     root = Path(tempfile.mkdtemp(prefix='tas-notes-live-')).resolve()
     project, state = root / '空白 test project', root / 'state'
@@ -144,6 +146,20 @@ def main():
     environment = dict(os.environ, TAS_NOTES_STATE_DIR=str(state))
     subprocess.run([sys.executable, str(SCRIPTS / 'tas_notes.py'), '--state-dir', str(state),
                     'configure-runtime'], check=True, capture_output=True)
+    if args.inspect_hook_shape:
+        # A test-local runtime trampoline observes stdin then forwards it unchanged.
+        # Do not change the installed plugin, global runtime, hooks or persisted trust.
+        import ctypes
+        probe = str(ROOT / 'tools/hook_shape_probe.py')
+        if os.name == 'nt':
+            buffer = ctypes.create_unicode_buffer(32768)
+            length = ctypes.windll.kernel32.GetShortPathNameW(probe, buffer, len(buffer))
+            probe = buffer.value if 0 < length < len(buffer) else probe
+        if not probe.isascii() or any(c in probe for c in '%!^&|<>"\r\n'):
+            raise RuntimeError('test probe needs a cmd-safe ASCII or short path')
+        runtime = state / 'runtime.cmd'
+        value = runtime.read_text(encoding='ascii')
+        runtime.write_text(value.replace(' %*', ' "' + probe + '" %*'), encoding='ascii')
     store = Store(state)
     store.set_project(str(project), True)
     print(json.dumps({'test_root': str(root), 'phase': args.phase}, ensure_ascii=True), flush=True)
@@ -166,6 +182,10 @@ def main():
         report['turns'].append(rpc.turn(thread_id, '这是安装测试。不要使用工具。只回复：TAS_NOTES_中文_OK。'))
         rows = store.listing()
         report['assertions']['record_created'] = bool(rows)
+        if args.phase == 'shape':
+            report['turns'].append(rpc.turn(thread_id,
+                '合成字段测试。只执行一次 cmd.exe /d /c exit 7；这是预期失败，不要重试，不要读取文件或访问网络。然后简短结束。'))
+            report['assertions']['failed_tool_observed'] = any(c['status'] == 'failed' for c in rpc.commands)
         if args.phase == 'flow' and rows:
             detail = store.detail(rows[0]['id'])
             review = store.save_revision(detail['id'], 'Synthetic review', 'Owner review before correction',
@@ -257,6 +277,9 @@ def main():
             store.set_project(str(project), False)
         report['hooks'] = rpc.hooks if rpc else []
         report['host_commands'] = rpc.commands if rpc else []
+        shapes = state / 'hook-shapes.jsonl'
+        if shapes.exists():
+            report['hook_shapes'] = [json.loads(line) for line in shapes.read_text(encoding='utf-8').splitlines()]
         report['records'] = []
         for row in store.listing():
             detail = store.detail(row['id'])

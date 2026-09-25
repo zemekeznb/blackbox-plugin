@@ -7,6 +7,12 @@
 </head>
 <body>
   <header><div class="brand">TAS Notes <span>本地审阅 · 原型</span></div><p>工作经过留在本机，由你决定如何整理和分享。</p></header>
+  <section class="capture" aria-label="采集状态">
+    <div class="capture-heading"><h2>采集状态</h2><button id="refresh-capture">刷新状态</button></div>
+    <p id="capture-status" role="status">正在读取本地配置…</p>
+    <p class="muted">这里显示本地配置和已保存的历史。插件是否安装、Hook 是否信任及当前是否持续投递，仍需在 Codex 中核对。</p>
+    <div id="capture-projects"></div><p id="capture-error" class="notice" hidden></p>
+  </section>
   <main>
     <aside aria-label="调查记录">
       <h1>调查记录</h1>
@@ -22,6 +28,7 @@
         <h2 id="record-heading">调查记录</h2><p id="meta" class="muted"></p>
         <p class="notice">回合结束不代表问题解决。保存人工版本也不表示验收通过或已发布。</p>
         <p class="muted">记录可能有缺口：本版不提取结构化工具退出状态；没有会话结束事件也不能说明任务还在运行。请展开草稿核对空返回、缺失正文与可能的编码丢失。</p>
+        <p id="record-summary" class="muted"></p>
         <details><summary>查看自动生成的过程草稿</summary><pre id="draft"></pre></details>
         <details><summary>查看捕获的事件与来源</summary><div id="events"></div></details>
         <label for="title">人工版本标题</label><input id="title" maxlength="200">

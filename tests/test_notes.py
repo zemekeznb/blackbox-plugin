@@ -118,6 +118,80 @@ class StoreTests(unittest.TestCase):
         self.assertIn('可能已发生编码丢失', draft)
         self.assertIn('本条没有可用的正文或原因', draft)
 
+    def test_status_configuration_capture_history_and_disable_are_separate(self):
+        initial = self.store.status()
+        self.assertEqual(initial['runtime']['state'], 'missing')
+        self.assertTrue(initial['projects'][0]['enabled'])
+        self.assertIsNone(initial['projects'][0]['last_recorded_event'])
+        self.assertEqual(self.cli('configure-runtime').returncode, 0)
+        configured = self.store.status()
+        self.assertEqual(configured['runtime']['state'], 'configured')
+        self.assertEqual(configured['continuous_capture'], 'unknown')
+        self.assertEqual(configured['host_integration'], 'not_checked')
+        self.capture()
+        self.cli('hook', data=b'{synthetic-bad-input')
+        failed = self.store.status()
+        self.assertEqual(failed['record_count'], 1)
+        self.assertEqual(failed['last_capture_error']['code'], 'JSONDecodeError')
+        before = failed['projects'][0]['last_recorded_event']
+        self.store.set_project(str(self.project), False)
+        self.store.record(self.event())
+        disabled = self.store.status()
+        self.assertFalse(disabled['projects'][0]['enabled'])
+        self.assertEqual(disabled['projects'][0]['last_recorded_event'], before)
+        self.assertEqual(disabled['last_capture_error'], failed['last_capture_error'])
+
+    def test_diagnostics_are_bounded_sanitized_and_never_execute_configuration(self):
+        marker = self.store.directory / 'last-error.json'
+        marker.write_text('{"code":"secret-value","time":"secret-value","body":"secret-value"}')
+        runtime = self.store.directory / 'runtime.cmd'
+        runtime.write_text('@echo secret-value > unexpected.txt')
+        self.store.record(self.event(prompt='private-prompt-value'))
+        value = self.store.status()
+        self.assertEqual(value['runtime']['state'], 'invalid')
+        self.assertEqual(value['last_capture_error']['code'], 'UnknownCaptureError')
+        self.assertNotIn('secret-value', json.dumps(value))
+        self.assertNotIn('private-prompt-value', json.dumps(value))
+        self.assertFalse((self.store.directory / 'unexpected.txt').exists())
+        marker.write_text('x' * 5000)
+        self.assertEqual(self.store.status()['last_capture_error']['state'], 'unreadable')
+        runtime.write_text('@"' + str(self.root / 'missing-python.exe') + '" %*\n')
+        self.assertEqual(self.store.status()['runtime']['state'], 'target_missing')
+
+    def test_first_prompt_title_is_a_label_and_human_title_wins(self):
+        identifier = self.store.record(dict(cwd=str(self.project), session_id='title-test',
+            hook_event_name='UserPromptSubmit', prompt='请排查\n  Y 的重试失败 ' + 'x' * 100))['investigation']
+        row = self.store.listing('Y 的重试')[0]
+        self.assertLessEqual(len(row['display_title']), 80)
+        self.assertEqual(row['title_source'], 'first_prompt')
+        detail = self.store.detail(identifier)
+        self.assertEqual(detail['display_title'], row['display_title'])
+        revision = self.store.save_revision(identifier, '人工标题', '人工正文', detail['source_seq'], 0)
+        frozen = self.store.export_revision(revision['id'])
+        self.store.record(dict(cwd=str(self.project), session_id='title-test',
+            hook_event_name='UserPromptSubmit', prompt='还是有问题'))
+        self.assertEqual(self.store.listing()[0]['display_title'], '人工标题')
+        self.assertEqual(self.store.listing()[0]['title_source'], 'human')
+        self.assertEqual(self.store.export_revision(revision['id']), frozen)
+
+    def test_test_only_shape_probe_forwards_unicode_without_logging_values(self):
+        target = self.root / 'forwarded.bin'
+        receiver = self.root / 'receiver.py'
+        receiver.write_text('import sys\nfrom pathlib import Path\nPath(' + repr(str(target))
+                            + ').write_bytes(sys.stdin.buffer.read())\n', encoding='utf-8')
+        payload = dict(hook_event_name='PostToolUse', tool_name='synthetic-secret-value',
+                       tool_input={'command': '中文'}, tool_response='', turn_id='synthetic-secret-value')
+        raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        result = subprocess.run([sys.executable, str(ROOT / 'tools/hook_shape_probe.py'), str(receiver)],
+            input=raw, capture_output=True, timeout=10,
+            env=dict(os.environ, TAS_NOTES_STATE_DIR=str(self.store.directory)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(target.read_bytes(), raw)
+        metadata = (self.store.directory / 'hook-shapes.jsonl').read_text(encoding='utf-8')
+        self.assertNotIn('synthetic-secret-value', metadata)
+        self.assertNotIn('中文', metadata)
+        self.assertEqual(json.loads(metadata)['fields']['tool_response'], 'str')
+
     def test_invalid_input_shapes_do_not_write(self):
         for changes in ({'hook_event_name': []}, {'hook_event_name': 'Unknown'},
                         {'session_id': None}, {'thread_id': 'different'},
@@ -231,6 +305,20 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.request('/api/records', Host='evil.example')[0], 403)
         self.assertEqual(self.request('/api/records')[0], 200)
         self.assertEqual(self.server.server_address[0], '127.0.0.1')
+
+    def test_status_requires_auth_and_excludes_record_bodies(self):
+        self.assertEqual(self.request('/api/status', auth=False)[0], 401)
+        self.assertEqual(self.request('/api/status', Origin='https://example.com')[0], 403)
+        code, raw, _ = self.request('/api/status')
+        self.assertEqual(code, 200)
+        self.assertEqual(json.loads(raw)['record_count'], 1)
+        self.assertNotIn(b'bad()', raw)
+
+    def test_rejected_post_bodies_do_not_reset_or_write_revisions(self):
+        for _ in range(100):
+            self.assertEqual(self.request('/api/revisions', 'POST', {'body': 'synthetic ' * 100}, auth=False)[0], 401)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM revisions').fetchone()[0], 0)
 
     def test_sources_are_json_and_static_paths_are_allowlisted(self):
         code, raw, headers = self.request('/api/record/' + self.identifier)

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import secrets
 import sqlite3
+import time
 from urllib.parse import parse_qs, urlsplit
 
 from tas_notes_core import Conflict, NotesError
@@ -33,6 +34,28 @@ def make_server(store, token=None):
             self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
             self.end_headers()
             self.wfile.write(body)
+            self.wfile.flush()
+            if self.command == 'POST' and not getattr(self, 'body_consumed', False):
+                self.drain_rejected_body()
+
+        def drain_rejected_body(self):
+            # A close with unread incoming bytes can discard the 401/403 on Windows.
+            # Send the rejection first; discard only a small, correctly framed body.
+            if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length', [])) != 1:
+                return
+            try:
+                remaining = int(self.headers['Content-Length'])
+                if not 0 < remaining <= 65536:
+                    return
+                deadline = time.monotonic() + 0.2
+                while remaining and time.monotonic() < deadline:
+                    self.connection.settimeout(max(0.001, deadline - time.monotonic()))
+                    chunk = self.rfile.read1(min(8192, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+            except (OSError, ValueError):
+                pass
 
         def check(self, authorized=False):
             expected = f'127.0.0.1:{self.server.server_port}'
@@ -62,6 +85,8 @@ def make_server(store, token=None):
                 elif request.path == '/api/records':
                     query = parse_qs(request.query).get('q', [''])[0]
                     self.send(200, store.listing(query))
+                elif request.path == '/api/status':
+                    self.send(200, store.status())
                 elif request.path.startswith('/api/record/'):
                     self.send(200, store.detail(request.path.removeprefix('/api/record/')))
                 elif request.path.startswith('/api/export/'):
@@ -90,7 +115,9 @@ def make_server(store, token=None):
                 if not 0 < length <= 900_000:
                     raise NotesError('invalid length')
                 self.connection.settimeout(5)
-                payload = json.loads(self.rfile.read(length))
+                raw = self.rfile.read(length)
+                self.body_consumed = True
+                payload = json.loads(raw)
                 if not isinstance(payload, dict) or set(payload) != {'id', 'title', 'body', 'source_seq', 'expected_revision'}:
                     raise NotesError('invalid fields')
                 result = store.save_revision(payload['id'], payload['title'], payload['body'],

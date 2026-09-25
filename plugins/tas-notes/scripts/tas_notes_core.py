@@ -206,10 +206,39 @@ class Store:
         with self.connect() as db:
             rows = db.execute('''SELECT i.*, (SELECT COUNT(*) FROM events e WHERE e.investigation=i.id) AS event_count,
                     (SELECT MAX(seq) FROM events e WHERE e.investigation=i.id) AS source_seq,
-                    (SELECT title FROM revisions r WHERE r.investigation=i.id ORDER BY number DESC LIMIT 1) AS title
+                    (SELECT title FROM revisions r WHERE r.investigation=i.id ORDER BY number DESC LIMIT 1) AS title,
+                    (SELECT content FROM events e WHERE e.investigation=i.id AND kind='UserPromptSubmit' ORDER BY seq LIMIT 1) AS first_prompt
                 FROM investigations i ORDER BY (SELECT MAX(seq) FROM events WHERE investigation=i.id) DESC LIMIT 500''').fetchall()
         items = [dict(r) for r in rows]
+        for item in items:
+            prompt = item.pop('first_prompt')
+            item['display_title'] = item['title'] or prompt_title(prompt) or f"调查 {item['id'][:8]}"
+            item['title_source'] = 'human' if item['title'] else 'first_prompt' if prompt_title(prompt) else 'fallback'
         return [r for r in items if query.casefold() in canonical(r).casefold()]
+
+    def status(self):
+        from tas_notes_diagnostics import runtime_status, last_error
+        with self.connect() as db:
+            db.execute('BEGIN')
+            projects = [dict(r) for r in db.execute('''SELECT p.path, p.enabled,
+                COUNT(DISTINCT i.id) AS record_count, COUNT(e.seq) AS event_count,
+                MAX(e.seq) AS last_seq FROM projects p
+                LEFT JOIN investigations i ON i.project=p.path
+                LEFT JOIN events e ON e.investigation=i.id GROUP BY p.path ORDER BY p.path''')]
+            for project in projects:
+                project['enabled'] = bool(project['enabled'])
+                seq = project.pop('last_seq')
+                event = db.execute('SELECT kind,captured,seq FROM events WHERE seq=?', (seq,)).fetchone()
+                project['last_recorded_event'] = dict(event) if event else None
+            # Retain a bounded metadata-only records list for CLI compatibility.
+            records = [dict(r) for r in db.execute('''SELECT i.id,i.project,COUNT(e.seq) AS event_count,
+                MAX(e.seq) AS source_seq FROM investigations i LEFT JOIN events e ON e.investigation=i.id
+                GROUP BY i.id ORDER BY source_seq DESC LIMIT 500''')]
+            db.commit()
+        return {'status_version': 1, 'runtime': runtime_status(self.directory), 'projects': projects,
+                'record_count': sum(p['record_count'] for p in projects), 'records': records,
+                'last_capture_error': last_error(self.directory),
+                'host_integration': 'not_checked', 'continuous_capture': 'unknown'}
 
     def detail(self, identifier):
         identifier = text(identifier, 'record id')
@@ -224,6 +253,8 @@ class Store:
         result = dict(row)
         result.update(events=events, revision=dict(revision) if revision else None,
                       source_seq=events[-1]['seq'] if events else 0)
+        first = next((e['content'] for e in events if e['kind'] == 'UserPromptSubmit'), None)
+        result['display_title'] = result['revision']['title'] if revision else prompt_title(first) or f"调查 {identifier[:8]}"
         result['draft'] = render_draft(result)
         return result
 
@@ -262,17 +293,31 @@ class Store:
                 + row['body'] + '\n')
 
 
+def prompt_title(content):
+    prompt = json.loads(content).get('prompt') if content else None
+    if not isinstance(prompt, str):
+        return None
+    value = ' '.join(prompt.split())
+    return value[:79] + '…' if len(value) > 80 else value or None
+
+
 def render_draft(record):
     parts = ['## 当前记录边界',
              '这是根据已捕获 Hook 材料生成的过程草稿，尚未经 Owner 审阅或验收。',
              '未读取会话原文件；未提供的理由和结果未知。以下内容是来源材料，不是独立验证结论。',
              '## 工作经过']
+    counts = {kind: sum(e['kind'] == kind for e in record['events']) for kind in EVENTS}
+    parts.insert(-1, f"已捕获：{counts['UserPromptSubmit']} 次用户输入 · {counts['PostToolUse']} 次工具操作 · "
+                 f"{counts['Stop']} 次 Agent 最后陈述。按落盘顺序展示；不代表完整过程或验收状态。")
+    kinds = {'SessionStart': '会话开始', 'UserPromptSubmit': '用户输入', 'PostToolUse': '工具操作',
+             'Stop': 'Agent 最后陈述', 'PreCompact': '压缩前', 'PostCompact': '压缩后',
+             'Interrupt': '用户中断', 'SessionEnd': '会话结束'}
     labels = {'prompt': '用户输入', 'last_assistant_message': 'Agent 最后陈述',
               'tool_name': '工具', 'tool_input': '工具输入', 'tool_response': '工具返回',
               'tool_result': '工具结果', 'error': '错误', 'reason': '宿主原因',
               'source': '宿主来源', 'message': '消息'}
     for event in record['events']:
-        parts.append(f"### 事件 {event['seq']} · {event['kind']}\n\n采集时间：{event['captured']}")
+        parts.append(f"### 事件 {event['seq']} · {kinds.get(event['kind'], event['kind'])}\n\n采集时间：{event['captured']}")
         content = json.loads(event['content'])
         if event['kind'] == 'PostToolUse':
             parts.append('**结果覆盖：本版未提取结构化退出状态，操作是否成功未知；请核对工具返回与外部证据。**')
@@ -365,12 +410,7 @@ def main(argv=None):
                 stream.write(body)
             result = {'exported': str(args.destination)}
         else:
-            with store.connect() as db:
-                projects = [dict(row) for row in db.execute('SELECT * FROM projects')]
-            result = {'projects': projects, 'records': store.listing(),
-                      'automatic_trigger': 'requires trusted Codex hooks; not established by this command'}
-            marker = Path(directory) / 'last-error.json'
-            result['last_capture_error'] = json.loads(marker.read_text(encoding='utf-8')) if marker.exists() else None
+            result = store.status()
         print(json.dumps(result, ensure_ascii=True, indent=2))
         return 0
     except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
