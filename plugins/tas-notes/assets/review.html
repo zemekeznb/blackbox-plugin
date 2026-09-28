@@ -29,15 +29,19 @@
         <p class="notice">回合结束不代表问题解决。保存人工版本也不表示验收通过或已发布。</p>
         <p class="muted">记录可能有缺口：本版不提取结构化工具退出状态；没有会话结束事件也不能说明任务还在运行。请展开草稿核对空返回、缺失正文与可能的编码丢失。</p>
         <p id="record-summary" class="muted"></p>
-        <details><summary>查看自动生成的过程草稿</summary><pre id="draft"></pre></details>
+        <p id="draft-state" class="notice"></p>
+        <div class="actions"><button id="summary-request">获取 Codex 整理指令</button><button id="use-draft">用当前草稿开始编辑</button></div>
+        <textarea id="summary-prompt" rows="3" readonly hidden aria-label="复制到 Codex 的整理指令"></textarea>
+        <article id="reading" aria-label="过程记录"></article>
+        <details><summary>自动摘录与覆盖缺口</summary><pre id="draft"></pre></details>
         <details><summary>查看捕获的事件与来源</summary><div id="events"></div></details>
-        <label for="title">人工版本标题</label><input id="title" maxlength="200">
+        <details id="editor"><summary>审阅与编辑人工版本</summary><label for="title">人工版本标题</label><input id="title" maxlength="200">
         <label for="body">审阅与编辑（Markdown）</label><textarea id="body" rows="20" maxlength="200000"></textarea>
         <div class="actions"><button id="save" class="primary">保存人工版本</button><button id="export" disabled>下载已保存版本</button></div>
-        <p class="muted">下载仅包含上次保存的人工版本。新增事件和未保存的编辑不会被悄悄加入。</p>
+        </details><p class="muted">下载仅包含上次保存的人工版本。新增事件和未保存的编辑不会被悄悄加入。</p>
       </div>
     </section>
   </main>
-  <footer>无 TAS 云端上传 · 无额外模型调用 · 不自动提交或推送 Git · 来源缺失与采集间隙仍可能存在</footer>
+  <footer>无 TAS 云端上传 · 整理使用当前 Codex 用量；无后台模型调用 · 不自动提交或推送 Git · 来源缺失与采集间隙仍可能存在</footer>
 </body>
 </html>

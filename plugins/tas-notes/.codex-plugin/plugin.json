@@ -1,6 +1,6 @@
 {
   "name": "tas-notes",
-  "version": "0.1.0+codex.20260925103732",
+  "version": "0.1.0+codex.20260928065117",
   "description": "Local Codex investigation records with versioned human review. Experimental Windows hooks.",
   "author": {
     "name": "Local developer"

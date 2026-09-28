@@ -148,6 +148,10 @@ class Store:
                     number INTEGER NOT NULL, source_seq INTEGER NOT NULL,
                     title TEXT NOT NULL, body TEXT NOT NULL, created TEXT NOT NULL,
                     UNIQUE(investigation, number));
+                CREATE TABLE IF NOT EXISTS summaries (
+                    id TEXT PRIMARY KEY, investigation TEXT NOT NULL REFERENCES investigations(id),
+                    source_seq INTEGER NOT NULL, fingerprint TEXT NOT NULL,
+                    content TEXT NOT NULL, created TEXT NOT NULL);
                 PRAGMA user_version=1;
             ''')
 
@@ -249,14 +253,70 @@ class Store:
                 raise NotesError('record not found')
             events = [dict(r) for r in db.execute('SELECT seq,kind,content,digest,captured FROM events WHERE investigation=? ORDER BY seq', (identifier,))]
             revision = db.execute('SELECT * FROM revisions WHERE investigation=? ORDER BY number DESC LIMIT 1', (identifier,)).fetchone()
+            summary = db.execute('SELECT * FROM summaries WHERE investigation=? ORDER BY rowid DESC LIMIT 1', (identifier,)).fetchone()
             db.commit()
         result = dict(row)
         result.update(events=events, revision=dict(revision) if revision else None,
                       source_seq=events[-1]['seq'] if events else 0)
         first = next((e['content'] for e in events if e['kind'] == 'UserPromptSubmit'), None)
         result['display_title'] = result['revision']['title'] if revision else prompt_title(first) or f"调查 {identifier[:8]}"
-        result['draft'] = render_draft(result)
+        from tas_notes_summary import render_summary
+        result['summary'] = dict(summary) if summary else None
+        result['summary_stale'] = bool(summary and summary['source_seq'] != result['source_seq'])
+        result['overview'] = render_draft(result)
+        result['draft'] = render_summary(result['summary']) if summary and not result['summary_stale'] else result['overview']
         return result
+
+    def summary_source(self, identifier, offset=0):
+        from tas_notes_summary import fingerprint, SECTIONS
+        if type(offset) is not int or offset < 0:
+            raise NotesError('invalid offset')
+        record = self.detail(identifier)
+        events = record['events']
+        return {'record_id': identifier, 'source_seq': record['source_seq'],
+                'fingerprint': fingerprint(events),
+                'expected_summary': record['summary']['id'] if record['summary'] else None,
+                'sections': list(SECTIONS), 'event_count': len(events),
+                'next_offset': offset + 10 if offset + 10 < len(events) else None,
+                'events': [dict(seq=e['seq'], kind=e['kind'],
+                                content_preview=e['content'][:3000],
+                                preview_truncated=len(e['content']) > 3000,
+                                content_length=len(e['content'])) for e in events[offset:offset + 10]]}
+
+    def summary_event(self, identifier, seq, start=0):
+        if type(seq) is not int or type(start) is not int or start < 0:
+            raise NotesError('invalid event cursor')
+        record = self.detail(identifier)
+        event = next((e for e in record['events'] if e['seq'] == seq), None)
+        if not event:
+            raise NotesError('source not found')
+        from tas_notes_summary import fingerprint
+        content = event['content']
+        return {'record_id': identifier, 'source_seq': record['source_seq'],
+                'fingerprint': fingerprint(record['events']), 'seq': seq,
+                'content_chunk': content[start:start+6000],
+                'next_start': start+6000 if start+6000 < len(content) else None}
+
+    def save_summary(self, payload):
+        from tas_notes_summary import validate
+        if not isinstance(payload, dict):
+            raise NotesError('invalid summary')
+        if len(canonical(payload).encode('utf-8')) > 800_000:
+            raise NotesError('summary too large')
+        if self.database.stat().st_size > MAX_DATABASE_BYTES:
+            raise NotesError('local database limit reached')
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            record = self.detail(payload.get('record_id'))
+            sections = validate(payload, record)
+            content = canonical(sections)
+            if len(content) > 100_000:
+                raise NotesError('summary too long')
+            identifier = str(uuid4())
+            db.execute('INSERT INTO summaries VALUES (?,?,?,?,?,?)',
+                       (identifier, record['id'], record['source_seq'], payload['fingerprint'], content, now()))
+            db.commit()
+        return {'id': identifier, 'source_seq': record['source_seq'], 'human_reviewed': False}
 
     def save_revision(self, identifier, title, body, source_seq, expected_revision):
         identifier = text(identifier, 'record id')
@@ -302,44 +362,8 @@ def prompt_title(content):
 
 
 def render_draft(record):
-    parts = ['## 当前记录边界',
-             '这是根据已捕获 Hook 材料生成的过程草稿，尚未经 Owner 审阅或验收。',
-             '未读取会话原文件；未提供的理由和结果未知。以下内容是来源材料，不是独立验证结论。',
-             '## 工作经过']
-    counts = {kind: sum(e['kind'] == kind for e in record['events']) for kind in EVENTS}
-    parts.insert(-1, f"已捕获：{counts['UserPromptSubmit']} 次用户输入 · {counts['PostToolUse']} 次工具操作 · "
-                 f"{counts['Stop']} 次 Agent 最后陈述。按落盘顺序展示；不代表完整过程或验收状态。")
-    kinds = {'SessionStart': '会话开始', 'UserPromptSubmit': '用户输入', 'PostToolUse': '工具操作',
-             'Stop': 'Agent 最后陈述', 'PreCompact': '压缩前', 'PostCompact': '压缩后',
-             'Interrupt': '用户中断', 'SessionEnd': '会话结束'}
-    labels = {'prompt': '用户输入', 'last_assistant_message': 'Agent 最后陈述',
-              'tool_name': '工具', 'tool_input': '工具输入', 'tool_response': '工具返回',
-              'tool_result': '工具结果', 'error': '错误', 'reason': '宿主原因',
-              'source': '宿主来源', 'message': '消息'}
-    for event in record['events']:
-        parts.append(f"### 事件 {event['seq']} · {kinds.get(event['kind'], event['kind'])}\n\n采集时间：{event['captured']}")
-        content = json.loads(event['content'])
-        if event['kind'] == 'PostToolUse':
-            parts.append('**结果覆盖：本版未提取结构化退出状态，操作是否成功未知；请核对工具返回与外部证据。**')
-            if not any(content.get(key) not in (None, '', {}, []) for key in ('tool_response', 'tool_result')):
-                parts.append('**工具返回缺失或为空，不能据此判断成功。**')
-        if event['kind'] in ('PreCompact', 'PostCompact', 'Interrupt') and not any(key in content for key in FIELDS):
-            parts.append('仅捕获到事件发生；本条没有可用的正文或原因。')
-        if '\ufffd' in canonical(content):
-            parts.append('**材料含替换字符（�），可能已发生编码丢失；保留原样，不猜测还原。**')
-        for key in FIELDS:
-            if key not in content:
-                continue
-            value = content[key]
-            display = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
-            fence = '`' * max(3, max((len(m.group()) + 1 for m in re.finditer(r'`+', display)), default=3))
-            parts.append(f"**{labels[key]}**\n\n{fence}text\n{display}\n{fence}")
-        truncated = content['_coverage']['truncated_fields']
-        if truncated:
-            parts.append('材料因大小限制截断：' + ', '.join(truncated))
-    parts.extend(['## 理由与依据', '请根据上方来源补充；没有来源的解释保持未知。',
-                  '## 结果与待确认', '回合结束不代表问题解决。请区分测试结果、Agent 判断和用户反馈。'])
-    return '\n\n'.join(parts)
+    from tas_notes_summary import readable
+    return readable(record)
 
 
 def diagnostic(directory, code):
@@ -367,6 +391,15 @@ def main(argv=None):
         commands.add_parser(command).add_argument('project')
     commands.add_parser('hook')
     commands.add_parser('status')
+    source = commands.add_parser('summary-source')
+    source.add_argument('record_id')
+    source.add_argument('--offset', type=int, default=0)
+    event = commands.add_parser('summary-event')
+    event.add_argument('record_id')
+    event.add_argument('seq', type=int)
+    event.add_argument('--start', type=int, default=0)
+    summary = commands.add_parser('summary-save')
+    summary.add_argument('source_file', type=Path)
     commands.add_parser('configure-runtime')
     commands.add_parser('serve')
     export = commands.add_parser('export')
@@ -400,6 +433,16 @@ def main(argv=None):
             result = store.record(json.loads(raw.decode('utf-8-sig')))
             # Never inject captured text or additional instructions into the Agent.
             return 0
+        elif args.command == 'summary-source':
+            result = store.summary_source(args.record_id, args.offset)
+        elif args.command == 'summary-event':
+            result = store.summary_event(args.record_id, args.seq, args.start)
+        elif args.command == 'summary-save':
+            with args.source_file.open('rb') as stream:
+                raw = stream.read(800_001)
+            if len(raw) > 800_000:
+                raise NotesError('summary too large')
+            result = store.save_summary(json.loads(raw.decode('utf-8-sig')))
         elif args.command == 'serve':
             from tas_notes_web import serve
             serve(store)

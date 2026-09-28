@@ -90,11 +90,18 @@ async function openRecord(id) {
   element('title').value = record.display_title;
   recordSummary(record);
   element('body').value = record.revision?.body || (record.draft.length <= 200000 ? record.draft : '来源材料超过人工版本容量。请参考下方草稿与来源，整理为不超过 200000 字符的记录。');
-  element('draft').textContent = record.draft;
+  element('draft').textContent = record.overview;
+  element('summary-prompt').hidden = true;
+  element('draft-state').textContent = record.revision
+    ? '正在阅读已保存的人工版本。新增草稿不会覆盖它；可点击“用当前草稿开始编辑”对照整理。'
+    : record.summary_stale ? '有新增来源，旧 Agent 草稿已过期。当前展示自动摘录，请让 Codex 重新整理。'
+    : record.summary ? '这是 Agent 整理草稿，引用已匹配来源，内容仍待你核对。'
+    : '当前是自动摘录，尚未生成语义总结。点击“获取 Codex 整理指令”，让当前 Agent 整理。';
+  renderReading(record.revision?.body || record.draft);
   element('export').disabled = !record.revision;
   const events = element('events'); events.replaceChildren();
   for (const event of record.events) {
-    const detail = document.createElement('details');
+    const detail = document.createElement('details'); detail.id = `source-${event.seq}`;
     const summary = document.createElement('summary');
     const labels = {SessionStart: '会话开始', UserPromptSubmit: '用户输入', PostToolUse: '工具操作',
       Stop: 'Agent 最后陈述', PreCompact: '压缩前', PostCompact: '压缩后', Interrupt: '用户中断', SessionEnd: '会话结束'};
@@ -117,6 +124,8 @@ async function save() {
     const result = await (await api('/api/revisions', snapshot)).json();
     selected.revision = {...snapshot, ...result};
     recordSummary(selected);
+    renderReading(snapshot.body);
+    element('draft-state').textContent = '正在阅读已保存的人工版本；它不会被新增草稿覆盖。';
     element('record-heading').textContent = snapshot.title;
     dirty = element('title').value !== snapshot.title || element('body').value !== snapshot.body;
     element('export').disabled = false;
@@ -132,6 +141,48 @@ async function exportSaved() {
   link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   status('已请求下载上次保存的人工版本；没有上传或 Git 推送。');
 }
+// Only text nodes and locally validated source buttons; never execute source HTML/Markdown.
+function renderReading(body) {
+  const target = element('reading'); target.replaceChildren();
+  const available = new Set(selected.events.map(event => event.seq));
+  for (const line of body.split('\n')) {
+    if (!line.trim()) continue;
+    const heading = /^(#{1,3}) (.*)$/.exec(line);
+    const node = document.createElement(heading ? (heading[1].length < 3 ? 'h3' : 'h4') : 'p');
+    const value = heading ? heading[2] : line;
+    let start = 0;
+    for (const match of value.matchAll(/\[来源 #(\d+)\]/g)) {
+      node.append(document.createTextNode(value.slice(start, match.index)));
+      const seq = Number(match[1]);
+      if (available.has(seq)) {
+        const button = document.createElement('button'); button.className = 'citation'; button.textContent = `来源 #${seq}`;
+        button.addEventListener('click', () => {
+          const source = element(`source-${seq}`); source.open = true;
+          source.parentElement.closest('details').open = true;
+          source.scrollIntoView({behavior: 'smooth', block: 'center'});
+        });
+        node.append(button);
+      } else node.append(document.createTextNode(match[0]));
+      start = match.index + match[0].length;
+    }
+    node.append(document.createTextNode(value.slice(start))); target.append(node);
+  }
+}
+element('summary-request').addEventListener('click', () => {
+  if (!selected) return;
+  const prompt = element('summary-prompt');
+  prompt.value = `请使用 TAS Notes 审阅技能，为记录 ${selected.id}（项目 ${selected.project}）生成或更新有来源的过程总结。保留失败、纠正和未知，不覆盖人工版本。整理会读取这份本地记录到当前 Codex 上下文。`;
+  prompt.hidden = false; prompt.focus(); prompt.select();
+  status('复制上方指令发送给 Codex。网页本身不会启动模型；整理完成后重新打开记录。');
+});
+element('use-draft').addEventListener('click', () => {
+  if (!selected || busy) return;
+  if ((dirty || selected.revision) && !confirm('用当前草稿替换编辑框内容？已保存的人工版本仍保留；未保存编辑会丢失。')) return;
+  if (selected.draft.length > 200000) {status('草稿过长，请先让 Codex 整理。'); return;}
+  element('body').value = selected.draft; dirty = true; ++editSequence;
+  element('editor').open = true;
+  status('草稿已放入编辑框，尚未保存。');
+});
 for (const id of ['title', 'body']) element(id).addEventListener('input', () => {dirty = true; ++editSequence;});
 for (const [id, action] of [['search', list], ['refresh', list], ['save', save], ['export', exportSaved]]) {
   element(id).addEventListener('click', () => action().catch(e => status(e.message)));
