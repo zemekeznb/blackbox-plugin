@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import secrets
 import sqlite3
@@ -135,10 +136,14 @@ def make_server(store, token=None):
     return server, token
 
 
-def serve(store):
+def serve(store, ready_file=None):
     server, token = make_server(store)
-    print(f'Local review: http://127.0.0.1:{server.server_port}/#token={token}', flush=True)
-    print('Keep this process running. Ctrl+C stops the local reviewer.', flush=True)
+    url = f'http://127.0.0.1:{server.server_port}/#token={token}'
+    if ready_file is not None:
+        Path(ready_file).write_text(json.dumps({'url': url, 'pid': os.getpid()}), encoding='utf-8')
+    else:
+        print(f'Local review: {url}', flush=True)
+        print('Keep this process running. Ctrl+C stops the local reviewer.', flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

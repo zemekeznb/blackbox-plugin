@@ -49,11 +49,14 @@ async function captureStatus() {
   }
 }
 async function api(path, body) {
-  const response = await fetch(path, {
+  let response;
+  try { response = await fetch(path, {
     method: body ? 'POST' : 'GET',
     headers: {Authorization: `Bearer ${token || ''}`, ...(body ? {'Content-Type': 'application/json'} : {})},
     ...(body ? {body: JSON.stringify(body)} : {})
-  });
+  }); } catch (_) {
+    throw new Error('无法连接本地审阅服务，服务可能已停止。当前页面内容和未保存编辑仍保留，请先复制保存。让 Codex 重新打开 TAS Notes 后，使用新链接；旧链接不会自动恢复。');
+  }
   if (!response.ok) {
     if (response.status === 409) throw new Error('已有新事件或其他人工版本。当前编辑仍在页面内，请先复制保存，再重新打开记录核对。');
     if (response.status === 401) throw new Error('缺少本地审阅凭据，请使用启动程序显示的完整链接打开。');

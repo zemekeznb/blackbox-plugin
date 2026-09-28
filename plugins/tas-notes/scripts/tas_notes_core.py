@@ -401,7 +401,10 @@ def main(argv=None):
     summary = commands.add_parser('summary-save')
     summary.add_argument('source_file', type=Path)
     commands.add_parser('configure-runtime')
-    commands.add_parser('serve')
+    server = commands.add_parser('serve')
+    server_mode = server.add_mutually_exclusive_group()
+    server_mode.add_argument('--background', action='store_true')
+    server_mode.add_argument('--ready-file', type=Path, help=argparse.SUPPRESS)
     export = commands.add_parser('export')
     export.add_argument('revision_id')
     export.add_argument('destination', type=Path)
@@ -444,9 +447,13 @@ def main(argv=None):
                 raise NotesError('summary too large')
             result = store.save_summary(json.loads(raw.decode('utf-8-sig')))
         elif args.command == 'serve':
-            from tas_notes_web import serve
-            serve(store)
-            return 0
+            if args.background:
+                from tas_notes_launcher import background
+                result = background(store)
+            else:
+                from tas_notes_web import serve
+                serve(store, args.ready_file)
+                return 0
         elif args.command == 'export':
             body = store.export_revision(args.revision_id)
             with args.destination.open('x', encoding='utf-8', newline='\n') as stream:
