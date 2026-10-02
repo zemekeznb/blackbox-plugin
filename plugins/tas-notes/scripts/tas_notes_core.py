@@ -401,6 +401,8 @@ def main(argv=None):
     summary = commands.add_parser('summary-save')
     summary.add_argument('source_file', type=Path)
     commands.add_parser('configure-runtime')
+    opener = commands.add_parser('open')
+    opener.add_argument('--no-browser', action='store_true')
     server = commands.add_parser('serve')
     server_mode = server.add_mutually_exclusive_group()
     server_mode.add_argument('--background', action='store_true')
@@ -446,6 +448,13 @@ def main(argv=None):
             if len(raw) > 800_000:
                 raise NotesError('summary too large')
             result = store.save_summary(json.loads(raw.decode('utf-8-sig')))
+        elif args.command == 'open':
+            from tas_notes_launcher import ensure_reviewer
+            result = ensure_reviewer(store)
+            if not args.no_browser:
+                import webbrowser
+                if not webbrowser.open(result['url']):
+                    raise NotesError('default browser unavailable')
         elif args.command == 'serve':
             if args.background:
                 from tas_notes_launcher import background

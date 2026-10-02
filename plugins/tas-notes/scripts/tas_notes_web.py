@@ -18,6 +18,8 @@ ASSETS = Path(__file__).resolve().parent.parent / 'assets'
 
 def make_server(store, token=None):
     token = token or secrets.token_urlsafe(32)
+    from tas_notes_launcher import build_id
+    build = build_id()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -83,6 +85,9 @@ def make_server(store, token=None):
                 if request.path in static:
                     name, mime = static[request.path]
                     self.send(200, (ASSETS / name).read_bytes(), mime)
+                elif request.path == '/api/health':
+                    self.send(200, {'service': 'tas-notes-review', 'protocol': 1,
+                                    'pid': os.getpid(), 'build': build})
                 elif request.path == '/api/records':
                     query = parse_qs(request.query).get('q', [''])[0]
                     self.send(200, store.listing(query))
