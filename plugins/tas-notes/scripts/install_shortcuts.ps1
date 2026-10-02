@@ -46,7 +46,17 @@ foreach ($notesShortcutPath in $notesShortcutPaths) {
     $notesShortcut.Arguments = '"' + (Join-Path $notesApp 'scripts/open_notes.py') + '"'
     $notesShortcut.WorkingDirectory = $notesApp
     $notesShortcut.Description = 'TAS Notes local review launcher'
-    $notesShortcut.WindowStyle = 7
+    # pythonw already avoids a console; do not request a minimized launch.
+    $notesShortcut.WindowStyle = 1
     $notesShortcut.Save()
+    # COM Save() succeeding alone does not prove that Windows has a usable link.
+    $notesVerified = $notesShell.CreateShortcut($notesShortcutPath)
+    if ($notesVerified.TargetPath -ne $notesPythonw -or
+        $notesVerified.Arguments -ne $notesShortcut.Arguments -or
+        $notesVerified.WorkingDirectory -ne $notesApp -or
+        $notesVerified.WindowStyle -ne 1 -or
+        -not (Test-Path -LiteralPath $notesVerified.TargetPath -PathType Leaf)) {
+        throw "Shortcut verification failed: $notesShortcutPath"
+    }
 }
 [pscustomobject]@{ shortcuts=$notesShortcutPaths; application=$notesApp; python=$notesPythonw } | ConvertTo-Json
