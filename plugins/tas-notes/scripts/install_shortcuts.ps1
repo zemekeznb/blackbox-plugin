@@ -40,10 +40,16 @@ foreach ($notesFolder in @('scripts','assets')) {
         } else { Copy-Item -LiteralPath $notesFile.FullName -Destination $notesTarget }
     }
 }
+# A packaged Codex process may write LocalAppData into its MSIX LocalCache.
+# Explorer cannot see that virtual overlay: persist the real file-handle path.
+$notesEntry = (& $notesPython -c 'import sys; sys.path.insert(0,sys.argv[1]); from tas_notes_launcher import physical_file_path; print(physical_file_path(sys.argv[2]))' (Join-Path $notesSource 'scripts') (Join-Path $notesApp 'scripts/open_notes.py')).Trim()
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $notesEntry -PathType Leaf)) { throw 'Cannot resolve installed launcher.' }
+$notesApp = Split-Path (Split-Path $notesEntry -Parent) -Parent
+$notesState = Split-Path (Split-Path $notesApp -Parent) -Parent
 foreach ($notesShortcutPath in $notesShortcutPaths) {
     $notesShortcut = $notesShell.CreateShortcut($notesShortcutPath)
     $notesShortcut.TargetPath = $notesPythonw
-    $notesShortcut.Arguments = '"' + (Join-Path $notesApp 'scripts/open_notes.py') + '"'
+    $notesShortcut.Arguments = '"' + $notesEntry + '" --state-dir "' + $notesState + '"'
     $notesShortcut.WorkingDirectory = $notesApp
     $notesShortcut.Description = 'TAS Notes local review launcher'
     # pythonw already avoids a console; do not request a minimized launch.

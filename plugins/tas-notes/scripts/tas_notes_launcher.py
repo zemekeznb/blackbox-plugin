@@ -12,6 +12,26 @@ import re
 from contextlib import contextmanager
 
 
+def physical_file_path(path):
+    """Resolve MSIX file virtualization through an actual open file handle."""
+    if os.name != 'nt':
+        return str(Path(path).resolve(strict=True))
+    import ctypes
+    import msvcrt
+    api = ctypes.WinDLL('kernel32', use_last_error=True).GetFinalPathNameByHandleW
+    api.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32]
+    api.restype = ctypes.c_uint32
+    with Path(path).open('rb') as stream:
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = api(msvcrt.get_osfhandle(stream.fileno()), buffer, len(buffer), 0)
+        if not size or size >= len(buffer):
+            raise OSError('cannot resolve physical launcher path')
+        value = buffer.value
+    if value.startswith('\\\\?\\UNC\\'):
+        return '\\\\' + value[8:]
+    return value[4:] if value.startswith('\\\\?\\') else value
+
+
 def build_id():
     root = Path(__file__).resolve().parent.parent
     digest = hashlib.sha256()
