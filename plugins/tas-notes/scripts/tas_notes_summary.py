@@ -14,6 +14,7 @@ def excerpt(value, limit=600):
     if not isinstance(value, str):
         return ''
     value = ' '.join(value.split())
+    value = value.replace('[来源 #', '［来源 #')
     return value[:limit] + ('…（摘录，完整内容见来源）' if len(value) > limit else '')
 
 
@@ -26,14 +27,14 @@ def readable(record):
         # Keep visible speech even if the host attaches it to a different event kind.
         if isinstance(c.get('prompt'), str):
             turn += 1
-            parts += [f'### 第 {turn} 轮 · 用户要求或反馈', f"{excerpt(c['prompt'], 1200)} {ref}"]
+            parts += [f'### 第 {turn} 轮 · 用户要求或反馈', f"用户原话摘录：{excerpt(c['prompt'], 1200)} {ref}"]
         if event['kind'] == 'PostToolUse':
             name = excerpt(c.get('tool_name'), 80) or '未命名工具'
             parts.append(f'- 调用了 {name}。结果尚未核实；输入和返回见来源。{ref}')
             if not any(c.get(k) not in (None, '', {}, []) for k in ('tool_response', 'tool_result')):
                 parts.append(f'- 工具返回缺失或为空，不能判断成功。{ref}')
         if isinstance(c.get('last_assistant_message'), str):
-            parts += ['### Agent 的说明（尚非独立验证）', f"{excerpt(c['last_assistant_message'], 1600)} {ref}"]
+            parts += ['### Agent 的说明（尚非独立验证）', f"Agent 原话摘录：{excerpt(c['last_assistant_message'], 1600)} {ref}"]
         if c.get('error'):
             parts.append(f'- 来源带有错误字段，请核对，不能由此推断整个任务结果。{ref}')
         if event['kind'] in ('Interrupt', 'PreCompact', 'PostCompact'):
@@ -118,5 +119,6 @@ def render_summary(summary):
     parts.append('## 来源短引')
     parts.append('以下为捕获材料中的短引，随人工版本一起审阅；不等于完整原文或独立核验。')
     for seq, quote in citations:
-        parts.append(f"- [来源 #{seq}] 「{' '.join(quote.split())}」")
+        safe_quote = ' '.join(quote.split()).replace('[来源 #', '［来源 #')
+        parts.append(f"- [来源 #{seq}] 「{safe_quote}」")
     return '\n\n'.join(parts)

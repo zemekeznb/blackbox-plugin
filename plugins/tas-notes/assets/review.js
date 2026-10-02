@@ -8,8 +8,12 @@ let openSequence = 0;
 let editSequence = 0;
 let listSequence = 0;
 let captureSequence = 0;
-function status(message) { element('status').textContent = message; }
+function status(message) {
+  element('status').textContent = message;
+  element('editor-status').textContent = message;
+}
 function dateLabel(stamp) {
+  if (!stamp) return '时间未知';
   const date = new Date(stamp);
   return Number.isNaN(date.getTime()) ? '时间未知' : date.toLocaleString();
 }
@@ -42,24 +46,31 @@ async function captureStatus() {
     element('capture-error').hidden = !failure;
     element('capture-error').textContent = failure
       ? `最近失败标记：${failure.code} · ${failure.time ? dateLabel(failure.time) : '时间未知'}。这是全局历史标记，未定位到具体项目，也不表示当前仍失败。` : '';
+    element('capture-history').hidden = !failure;
+    element('capture-help').textContent = value.runtime.state === 'configured'
+      ? '若预期有新记录却未出现，请刷新状态，并在 Codex 中检查项目启用、Hook 信任及最近投递。'
+      : '请在 Codex 中说“检查 TAS Notes 的 Python 配置和采集状态”。已有记录仍可阅读。';
   } catch (error) {
     if (sequence !== captureSequence) return;
     element('capture-status').textContent = `状态读取失败：${error.message}`;
-    element('capture-projects').replaceChildren(); element('capture-error').hidden = true;
+    element('capture-projects').replaceChildren(); element('capture-history').hidden = true;
+    element('capture-help').textContent = '先保留未保存编辑，再双击桌面或开始菜单中的 TAS Notes 重新打开。';
   }
 }
 async function api(path, body) {
   let response;
   try { response = await fetch(path, {
+    signal: AbortSignal.timeout(15000),
     method: body ? 'POST' : 'GET',
     headers: {Authorization: `Bearer ${token || ''}`, ...(body ? {'Content-Type': 'application/json'} : {})},
     ...(body ? {body: JSON.stringify(body)} : {})
   }); } catch (_) {
-    throw new Error('无法连接本地审阅服务，服务可能已停止。当前页面内容和未保存编辑仍保留，请先复制保存。让 Codex 重新打开 TAS Notes 后，使用新链接；旧链接不会自动恢复。');
+    throw new Error('本地服务未响应或连接中断。未保存编辑仍在当前页面，请先复制保存，再双击桌面或开始菜单中的 TAS Notes（也可让 Codex 打开）。若刚才正在保存，请重新核对版本；不能确定请求是否已落盘。');
   }
   if (!response.ok) {
     if (response.status === 409) throw new Error('已有新事件或其他人工版本。当前编辑仍在页面内，请先复制保存，再重新打开记录核对。');
     if (response.status === 401) throw new Error('缺少本地审阅凭据，请使用启动程序显示的完整链接打开。');
+    if (response.status === 503) throw new Error('本地记录暂时无法读取或写入，可能被占用或磁盘不可写。请稍后重试；未保存编辑仍在页面内。');
     throw new Error('操作未完成，请检查输入或本地程序。');
   }
   return response;
@@ -71,12 +82,16 @@ async function list() {
   const container = element('records'); container.replaceChildren();
   for (const row of rows) {
     const button = document.createElement('button'); button.className = 'record';
+    button.dataset.recordId = row.id;
+    button.setAttribute('aria-current', String(selected?.id === row.id));
     const title = document.createElement('strong'); title.textContent = row.display_title || `调查 ${row.id.slice(0,8)}`;
     const meta = document.createElement('small'); meta.textContent = `${row.event_count} 个事件 · ${row.title_source === 'human' ? '人工标题' : '首条输入 / 默认名称'} · ${row.project}`;
     button.append(title, meta); button.addEventListener('click', () => openRecord(row.id).catch(e => status(e.message)));
     container.append(button);
   }
-  status(rows.length ? `找到 ${rows.length} 份本地记录。` : '暂无记录。请先为项目启用记录；安装插件本身不会授权采集。');
+  element('list-status').textContent = rows.length ? `找到 ${rows.length} 份本地记录。` : element('query').value.trim()
+    ? '没有匹配记录，请尝试其他标题或项目名称。搜索范围为最近 500 条。'
+    : '暂无记录。请先为项目启用记录；安装插件本身不会授权采集。';
 }
 async function openRecord(id) {
   if (busy) return;
@@ -87,12 +102,17 @@ async function openRecord(id) {
   if (sequence !== openSequence) return;
   if (edits !== editSequence) {status('打开期间有新增编辑，已保留当前内容。请保存后再切换记录。'); return;}
   selected = record; dirty = false;
+  for (const button of element('records').children) button.setAttribute('aria-current', String(button.dataset.recordId === id));
   element('empty').hidden = true; element('detail').hidden = false;
   element('record-heading').textContent = record.display_title;
   element('meta').textContent = `${record.project} · ${record.events.length} 个事件 · 仅本地`;
   element('title').value = record.display_title;
   recordSummary(record);
-  element('body').value = record.revision?.body || (record.draft.length <= 200000 ? record.draft : '来源材料超过人工版本容量。请参考下方草稿与来源，整理为不超过 200000 字符的记录。');
+  element('body').value = record.revision?.body || (record.draft.length <= 200000 ? record.draft : '');
+  element('body').placeholder = '在这里整理过程、依据、结果与待确认事项。';
+  element('editor-help').textContent = !record.revision && record.draft.length > 200000
+    ? '草稿超过编辑容量，未自动填入。请让 Codex 整理，或手动写入不超过 200000 字符的内容。'
+    : '编辑后保存为独立人工版本；保存不等于确认问题已解决。';
   element('draft').textContent = record.overview;
   element('summary-prompt').hidden = true;
   element('draft-state').textContent = record.revision
@@ -102,6 +122,7 @@ async function openRecord(id) {
     : '当前是自动摘录，尚未生成语义总结。点击“获取 Codex 整理指令”，让当前 Agent 整理。';
   renderReading(record.revision?.body || record.draft);
   element('export').disabled = !record.revision;
+  element('export-editor').disabled = !record.revision;
   const events = element('events'); events.replaceChildren();
   for (const event of record.events) {
     const detail = document.createElement('details'); detail.id = `source-${event.seq}`;
@@ -119,6 +140,9 @@ async function openRecord(id) {
 }
 async function save() {
   if (!selected || busy) return;
+  if (!element('title').value.trim() || !element('body').value.trim()) {
+    status('标题和正文不能为空。请先填写内容再保存。'); return;
+  }
   const snapshot = {id: selected.id,
     title: element('title').value, body: element('body').value,
     source_seq: selected.source_seq, expected_revision: selected.revision?.number || 0};
@@ -130,19 +154,25 @@ async function save() {
     renderReading(snapshot.body);
     element('draft-state').textContent = '正在阅读已保存的人工版本；它不会被新增草稿覆盖。';
     element('record-heading').textContent = snapshot.title;
+    for (const button of element('records').children) {
+      if (button.dataset.recordId === selected.id) button.querySelector('strong').textContent = snapshot.title;
+    }
     dirty = element('title').value !== snapshot.title || element('body').value !== snapshot.body;
     element('export').disabled = false;
+    element('export-editor').disabled = false;
     status(`人工版本 ${result.number} 已保存。${dirty ? '保存期间的新增编辑仍未保存。' : '尚未发布。'}`);
   } finally {busy = false; element('save').disabled = false;}
 }
 async function exportSaved() {
   if (!selected?.revision) return;
-  const response = await api(`/api/export/${encodeURIComponent(selected.revision.id)}`);
+  // Selection or revision can change during the request; pin content and name together.
+  const snapshot = {recordId: selected.id, revisionId: selected.revision.id, number: selected.revision.number};
+  const response = await api(`/api/export/${encodeURIComponent(snapshot.revisionId)}`);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement('a'); link.href = url;
-  link.download = `investigation-${selected.id}-v${selected.revision.number}.md`;
+  link.download = `investigation-${snapshot.recordId}-v${snapshot.number}.md`;
   link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  status('已请求下载上次保存的人工版本；没有上传或 Git 推送。');
+  status(`已请求下载人工版本 ${snapshot.number}；未包含未保存编辑。没有上传或 Git 推送。`);
 }
 // Only text nodes and locally validated source buttons; never execute source HTML/Markdown.
 function renderReading(body) {
@@ -187,10 +217,14 @@ element('use-draft').addEventListener('click', () => {
   status('草稿已放入编辑框，尚未保存。');
 });
 for (const id of ['title', 'body']) element(id).addEventListener('input', () => {dirty = true; ++editSequence;});
-for (const [id, action] of [['search', list], ['refresh', list], ['save', save], ['export', exportSaved]]) {
+for (const [id, action] of [['search', list], ['refresh', list], ['save', save], ['export', exportSaved], ['export-editor', exportSaved]]) {
   element(id).addEventListener('click', () => action().catch(e => status(e.message)));
 }
 element('refresh-capture').addEventListener('click', captureStatus);
+element('edit-record').addEventListener('click', () => {
+  element('editor').open = true; element('editor').scrollIntoView({behavior: 'smooth', block: 'start'});
+  element('title').focus();
+});
 element('query').addEventListener('keydown', event => {if (event.key === 'Enter') list().catch(e => status(e.message));});
 window.addEventListener('beforeunload', event => {if (dirty) {event.preventDefault(); event.returnValue = '';}});
 list().catch(e => status(e.message));

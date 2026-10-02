@@ -51,6 +51,21 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(NotesError):
             store.set_project(str(self.project), True)
 
+    def test_deleted_project_can_be_disabled_without_losing_records(self):
+        identifier = self.capture()
+        self.project.rmdir()
+        self.store.set_project(str(self.project), False)
+        self.assertFalse(self.store.status()['projects'][0]['enabled'])
+        self.assertEqual(self.store.detail(identifier)['id'], identifier)
+
+    def test_attachment_wrapper_does_not_hide_request_title(self):
+        event = dict(cwd=str(self.project), session_id='wrapper', hook_event_name='UserPromptSubmit',
+                     prompt='# Files mentioned by the user:\n## picture.png\n\n## My request:\n修复模型的边缘')
+        identifier = self.store.record(event)['investigation']
+        detail = self.store.detail(identifier)
+        self.assertEqual(detail['display_title'], '修复模型的边缘')
+        self.assertIn('picture.png', detail['events'][0]['content'])
+
     def test_dedup_and_conflicting_host_identity(self):
         identifier = self.capture()
         self.assertEqual(self.store.record(self.event())['status'], 'duplicate')
@@ -305,6 +320,17 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.request('/api/records', Host='evil.example')[0], 403)
         self.assertEqual(self.request('/api/records')[0], 200)
         self.assertEqual(self.server.server_address[0], '127.0.0.1')
+
+    def test_deep_json_rejected_and_favicon_is_quiet(self):
+        connection = http.client.HTTPConnection('127.0.0.1', self.server.server_port, timeout=3)
+        self.addCleanup(connection.close)
+        connection.request('POST', '/api/revisions', body=b'[' * 2000 + b'0' + b']' * 2000,
+                           headers={'Content-Type':'application/json','Authorization':'Bearer '+self.token})
+        response = connection.getresponse()
+        self.assertEqual(response.status, 400)
+        response.read()
+        self.assertEqual(self.request('/favicon.ico', auth=False)[0], 204)
+        self.assertIsNone(self.store.detail(self.identifier)['revision'])
 
     def test_status_requires_auth_and_excludes_record_bodies(self):
         self.assertEqual(self.request('/api/status', auth=False)[0], 401)

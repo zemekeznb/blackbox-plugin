@@ -119,6 +119,7 @@ $notesEntry = (Resolve-Path '.\plugins\tas-notes\scripts\tas_notes.py').Path
 
 ```powershell
 python -m unittest discover -s tests -v
+node --test tests/test_review_ui.cjs
 python '.\tools\probe_codex_hooks.py'
 ```
 
@@ -151,3 +152,7 @@ Windows 打包版 Codex 可能把上述目录重定向到应用的 `LocalCache/L
 Codex 内部打开统一使用 `tas_notes.py open --no-browser` 返回当前URL，外部直接运行 `tas_notes.py open` 打开默认浏览器。启动锁避免正常并发打开重复启动，鉴权健康检查核对应用标识、PID、协议和构建指纹。失效记录不是终止进程的指令；不同构建的旧服务不强杀，避免影响旧页面编辑。注册文件含本地令牌，不应分享。
 
 采集、规则摘录、打开页面没有额外模型调用。当前Agent阅读来源并生成智能总结会产生输入/输出token，并占用会话上下文；具体账户计量取决于使用方式。没有自动背景总结费用。
+
+## 边界审查（NOTES-011）
+
+已修复异步下载版本错配、超长草稿误保存、历史诊断误导及编辑入口等问题，详见 [审查报告](docs/reports/NOTES-011-boundary-audit.md)。当前仍缺少独立数据迁移/备份恢复、崩溃后的未保存草稿恢复、项目级采集缺口诊断及旧服务管理；可以继续受控试用，不应视作可靠长期档案系统。Node 仅用于前端开发测试，日常运行仍不依赖 Node。

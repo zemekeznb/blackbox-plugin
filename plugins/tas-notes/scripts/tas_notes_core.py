@@ -46,9 +46,9 @@ def text(value, field, maximum=512):
     return value
 
 
-def project_path(value):
+def project_path(value, require_exists=True):
     path = Path(text(value, 'project', 4096)).expanduser()
-    if not path.is_absolute() or not path.is_dir():
+    if not path.is_absolute() or (require_exists and not path.is_dir()):
         raise NotesError('project must be an existing absolute directory')
     return str(path.resolve())
 
@@ -166,7 +166,7 @@ class Store:
             db.close()
 
     def set_project(self, path, enabled):
-        path = project_path(path)
+        path = project_path(path, require_exists=enabled)
         # Runtime data must remain outside an enabled project, even with an override.
         if self.directory == Path(path) or Path(path) in self.directory.parents:
             raise NotesError('state directory must be outside the recorded project')
@@ -357,6 +357,11 @@ def prompt_title(content):
     prompt = json.loads(content).get('prompt') if content else None
     if not isinstance(prompt, str):
         return None
+    # Presentation only: preserve full original evidence, prefer the user request
+    # after Codex's attachment/context wrapper when that exact marker exists.
+    marker = '\n## My request:'
+    if marker in prompt:
+        prompt = prompt.split(marker, 1)[1]
     value = ' '.join(prompt.split())
     return value[:79] + '…' if len(value) > 80 else value or None
 

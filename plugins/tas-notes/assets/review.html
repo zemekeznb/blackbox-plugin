@@ -11,33 +11,34 @@
     <div class="capture-heading"><h2>采集状态</h2><button id="refresh-capture">刷新状态</button></div>
     <p id="capture-status" role="status">正在读取本地配置…</p>
     <p class="muted">这里显示本地配置和已保存的历史。插件是否安装、Hook 是否信任及当前是否持续投递，仍需在 Codex 中核对。</p>
-    <div id="capture-projects"></div><p id="capture-error" class="notice" hidden></p>
+    <div id="capture-projects"></div><p id="capture-help" class="muted"></p>
+    <details id="capture-history" hidden><summary>历史诊断（不代表当前故障）</summary><p id="capture-error" class="muted" hidden></p></details>
   </section>
   <main>
     <aside aria-label="调查记录">
       <h1>调查记录</h1>
       <label for="query">查找标题或项目</label>
-      <div class="search"><input id="query" type="search"><button id="search">查找</button></div>
+      <div class="search"><input id="query" type="search" maxlength="200"><button id="search">查找</button></div>
       <p class="muted">最多显示最近 500 条；列表不会自动刷新，避免打断编辑。</p>
-      <button id="refresh">刷新列表</button><div id="records"></div>
+      <button id="refresh">刷新列表</button><p id="list-status" role="status"></p><div id="records"></div>
     </aside>
     <section aria-label="记录详情">
-      <p id="status" role="status" aria-live="polite">正在连接本地记录…</p>
-      <div id="empty"><h2>从左侧选择一份记录</h2><p>仅显示已启用项目的本地材料。自动草稿与人工版本分开保存。</p></div>
+      <p id="status" role="status" aria-live="polite">选择记录后可阅读、编辑和下载。</p>
+      <div id="empty"><h2>从列表选择一份记录</h2><p>显示已捕获的本地材料，停用项目的历史也会保留。自动草稿与人工版本分开保存。</p></div>
       <div id="detail" hidden>
         <h2 id="record-heading">调查记录</h2><p id="meta" class="muted"></p>
         <p class="notice">回合结束不代表问题解决。保存人工版本也不表示验收通过或已发布。</p>
         <p class="muted">记录可能有缺口：本版不提取结构化工具退出状态；没有会话结束事件也不能说明任务还在运行。请展开草稿核对空返回、缺失正文与可能的编码丢失。</p>
         <p id="record-summary" class="muted"></p>
         <p id="draft-state" class="notice"></p>
-        <div class="actions"><button id="summary-request">获取 Codex 整理指令</button><button id="use-draft">用当前草稿开始编辑</button></div>
+        <div class="actions"><button id="edit-record" class="primary">编辑人工版本</button><button id="export" disabled>下载已保存版本</button><button id="summary-request">获取 Codex 整理指令</button><button id="use-draft">用当前草稿开始编辑</button></div>
         <textarea id="summary-prompt" rows="3" readonly hidden aria-label="复制到 Codex 的整理指令"></textarea>
         <article id="reading" aria-label="过程记录"></article>
         <details><summary>自动摘录与覆盖缺口</summary><pre id="draft"></pre></details>
         <details><summary>查看捕获的事件与来源</summary><div id="events"></div></details>
-        <details id="editor"><summary>审阅与编辑人工版本</summary><label for="title">人工版本标题</label><input id="title" maxlength="200">
+        <details id="editor"><summary>审阅与编辑人工版本</summary><p id="editor-help" class="muted"></p><label for="title">人工版本标题</label><input id="title" maxlength="200">
         <label for="body">审阅与编辑（Markdown）</label><textarea id="body" rows="20" maxlength="200000"></textarea>
-        <div class="actions"><button id="save" class="primary">保存人工版本</button><button id="export" disabled>下载已保存版本</button></div>
+        <div class="actions"><button id="save" class="primary">保存人工版本</button><button id="export-editor" disabled>下载已保存版本</button></div><p id="editor-status" role="status" aria-live="polite"></p>
         </details><p class="muted">下载仅包含上次保存的人工版本。新增事件和未保存的编辑不会被悄悄加入。</p>
       </div>
     </section>

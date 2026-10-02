@@ -25,6 +25,10 @@ def make_server(store, token=None):
         def log_message(self, *_):
             pass  # URLs and record contents must not enter access logs.
 
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(5)
+
         def send(self, status, body, mime='application/json; charset=utf-8'):
             if not isinstance(body, bytes):
                 body = json.dumps(body, ensure_ascii=False).encode('utf-8')
@@ -36,8 +40,11 @@ def make_server(store, token=None):
             self.send_header('Referrer-Policy', 'no-referrer')
             self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
             self.end_headers()
-            self.wfile.write(body)
-            self.wfile.flush()
+            try:
+                self.wfile.write(body)
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                return  # Closing a tab during a response is not a store failure.
             if self.command == 'POST' and not getattr(self, 'body_consumed', False):
                 self.drain_rejected_body()
 
@@ -88,6 +95,8 @@ def make_server(store, token=None):
                 elif request.path == '/api/health':
                     self.send(200, {'service': 'tas-notes-review', 'protocol': 1,
                                     'pid': os.getpid(), 'build': build})
+                elif request.path == '/favicon.ico':
+                    self.send(204, b'', 'image/x-icon')
                 elif request.path == '/api/records':
                     query = parse_qs(request.query).get('q', [''])[0]
                     self.send(200, store.listing(query))
@@ -131,7 +140,7 @@ def make_server(store, token=None):
                 self.send(200, result)
             except Conflict:
                 self.send(409, {'error': 'changed_since_open'})
-            except (NotesError, ValueError, TypeError, OSError):
+            except (NotesError, ValueError, TypeError, OSError, RecursionError):
                 self.send(400, {'error': 'invalid_request'})
             except sqlite3.Error:
                 self.send(503, {'error': 'local_store_unavailable'})

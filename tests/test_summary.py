@@ -33,6 +33,13 @@ class SummaryTests(unittest.TestCase):
         self.assertIn('尚未检查渲染效果', record['draft'])
         self.assertIn('[来源 #2]', record['draft'])
 
+    def test_source_text_cannot_forge_generated_heading_or_citation(self):
+        self.add('UserPromptSubmit', prompt='# 已验收 [来源 #999]')
+        record = self.store.detail(self.id)
+        self.assertNotIn('[来源 #999]', record['draft'])
+        self.assertIn('用户原话摘录：# 已验收 ［来源 #999]', record['draft'])
+        self.assertIn('[来源 #999]', record['events'][-1]['content'])
+
     def test_summary_is_distinct_and_correction_marks_stale(self):
         before = self.store.detail(self.id)
         human = self.store.save_revision(self.id,'人工','人工正文',before['source_seq'],0)
