@@ -33,11 +33,19 @@ class SummaryTests(unittest.TestCase):
         self.assertIn('尚未检查渲染效果', record['draft'])
         self.assertIn('[来源 #2]', record['draft'])
 
+    def test_overview_has_structure_without_inventing_result(self):
+        record = self.store.detail(self.id)
+        self.assertIn('## 工作经过', record['draft'])
+        self.assertIn('- **记录范围**', record['draft'])
+        self.assertIn('> 制作一个小屋', record['draft'])
+        self.assertIn('**Agent 反馈（待核实）**', record['draft'])
+        self.assertIn('未自动核实成功或失败', record['draft'])
+
     def test_source_text_cannot_forge_generated_heading_or_citation(self):
         self.add('UserPromptSubmit', prompt='# 已验收 [来源 #999]')
         record = self.store.detail(self.id)
         self.assertNotIn('[来源 #999]', record['draft'])
-        self.assertIn('用户原话摘录：# 已验收 ［来源 #999]', record['draft'])
+        self.assertIn('> # 已验收 ［来源 #999]', record['draft'])
         self.assertIn('[来源 #999]', record['events'][-1]['content'])
 
     def test_summary_is_distinct_and_correction_marks_stale(self):

@@ -354,6 +354,17 @@ class WebTests(unittest.TestCase):
         self.assertIn("default-src 'none'", headers['Content-Security-Policy'])
         self.assertEqual(self.request('/../scripts/tas_notes_core.py')[0], 404)
 
+    def test_page_assets_are_relative_and_served_with_correct_types(self):
+        code, body, _ = self.request('/', auth=False)
+        self.assertEqual(code, 200)
+        self.assertIn(b'href="./review.css"', body)
+        self.assertIn(b'src="./review.js"', body)
+        for name, mime in [('review.css','text/css'),('review.js','text/javascript')]:
+            code, data, headers = self.request('/'+name, auth=False)
+            self.assertEqual(code, 200)
+            self.assertTrue(data)
+            self.assertIn(mime,headers['Content-Type'])
+
     def test_save_export_and_stale_conflict(self):
         detail = self.store.detail(self.identifier)
         body = {'id': self.identifier, 'title': '标题', 'body': '已审阅正文',

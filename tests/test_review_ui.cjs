@@ -5,10 +5,10 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../plugins/tas-notes/assets/review.js'), 'utf8');
-function harness() {
+function harness(filePreview=false) {
   const elements = new Map(), downloads = [];
-  function node() {
-    return {value:'', textContent:'', hidden:false, children:[], dataset:{}, attrs:{},
+  function node(tag='div') {
+    return {tagName:tag.toUpperCase(), value:'', textContent:'', hidden:false, children:[], dataset:{}, attrs:{},
       append(...items){this.children.push(...items);}, replaceChildren(){this.children=[];},
       setAttribute(k,v){this.attrs[k]=v;}, addEventListener(){}, focus(){}, select(){}, scrollIntoView(){},
       click(){if(this.download) downloads.push(this.download);},
@@ -16,11 +16,11 @@ function harness() {
   }
   const get = id => {if(!elements.has(id)) elements.set(id,node()); return elements.get(id);};
   const context = vm.createContext({document:{getElementById:get,createElement:node,createTextNode:x=>x},
-    location:{hash:'#token=test'}, URLSearchParams, AbortSignal, URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},
+    location:{hash:'#token=test',protocol:filePreview?'file:':'http:'}, URLSearchParams, AbortSignal, URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},
     window:{addEventListener(){}}, confirm:()=>true, setTimeout(){},
     fetch:async()=>({ok:true,json:async()=>[]})});
   // Suppress only the two page-load requests; real functions below remain unchanged.
-  vm.runInContext(source.replace(/list\(\)\.catch\(e => status\(e.message\)\);\s*captureStatus\(\);\s*$/, ''),context);
+  vm.runInContext(filePreview ? source : source.slice(0,source.indexOf("if (location.protocol === 'file:')")),context);
   return {context,get,downloads,run:s=>vm.runInContext(s,context)};
 }
 function record(draft='draft') { return {id:'a',project:'test',display_title:'title',draft,overview:'overview',events:[],source_seq:0}; }
@@ -56,4 +56,19 @@ test('empty search and list refresh cannot overwrite editor status', async()=>{
   assert.match(h.get('list-status').textContent,/没有匹配/);
   assert.equal(h.get('status').textContent,'save conflict');
   assert.equal(h.run('dateLabel(null)'),'时间未知');
+});
+test('file preview explains launcher and disables unavailable actions',()=>{
+  const h=harness(true);
+  assert.equal(h.get('file-preview').hidden,false);
+  assert.equal(h.get('refresh').disabled,true);
+  assert.match(h.get('capture-status').textContent,/文件预览/);
+});
+test('Markdown uses semantic nodes while HTML, images and URLs remain inert text',()=>{
+  const h=harness(); h.run('selected={events:[{seq:1}]}');
+  h.context.content='## 标题\n\n- **重点** 和 `code` [来源 #1]\n- 第二项\n\n1. 步骤\n\n> 用户反馈\n\n```js\n<script>bad()</script>\n```\n\n![image](https://example.org/pixel) <img src=x onerror=bad()> [link](javascript:bad())';
+  h.run('renderReading(content)');
+  const all=[]; function walk(n){if(typeof n==='object'){all.push(n);n.children.forEach(walk);}} walk(h.get('reading'));
+  for(const tag of ['H3','UL','OL','LI','BLOCKQUOTE','STRONG','CODE','PRE','BUTTON']) assert.ok(all.some(n=>n.tagName===tag),tag);
+  for(const tag of ['SCRIPT','IMG','A']) assert.ok(!all.some(n=>n.tagName===tag),tag);
+  assert.ok(all.some(n=>n.tagName==='CODE' && n.textContent.includes('<script>')));
 });

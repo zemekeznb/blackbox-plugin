@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TAS Notes · 本地审阅</title>
-  <link rel="stylesheet" href="/review.css"><script src="/review.js" defer></script>
+  <link rel="stylesheet" href="./review.css"><script src="./review.js" defer></script>
 </head>
 <body>
   <header><div class="brand">TAS Notes <span>本地审阅 · 原型</span></div><p>工作经过留在本机，由你决定如何整理和分享。</p></header>
+  <section id="file-preview" hidden class="notice" role="status"><strong>当前是页面文件预览，不是记录服务。</strong><p>请双击桌面或开始菜单里的「TAS Notes」，或者在 Codex 中说“打开 TAS Notes 记录”。直接打开 HTML 不能读取或保存记录。</p></section>
   <section class="capture" aria-label="采集状态">
     <div class="capture-heading"><h2>采集状态</h2><button id="refresh-capture">刷新状态</button></div>
     <p id="capture-status" role="status">正在读取本地配置…</p>

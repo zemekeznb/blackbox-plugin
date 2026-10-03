@@ -174,32 +174,66 @@ async function exportSaved() {
   link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   status(`已请求下载人工版本 ${snapshot.number}；未包含未保存编辑。没有上传或 Git 推送。`);
 }
-// Only text nodes and locally validated source buttons; never execute source HTML/Markdown.
+// Deliberately small Markdown subset. All source content stays in text nodes.
+// No raw HTML, links, images or embedded resources are executed or requested.
 function renderReading(body) {
   const target = element('reading'); target.replaceChildren();
   const available = new Set(selected.events.map(event => event.seq));
-  for (const line of body.split('\n')) {
-    if (!line.trim()) continue;
-    const heading = /^(#{1,3}) (.*)$/.exec(line);
-    const node = document.createElement(heading ? (heading[1].length < 3 ? 'h3' : 'h4') : 'p');
-    const value = heading ? heading[2] : line;
+  function inline(parent, value) {
+    const tokens = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[来源 #\d+\])/g;
     let start = 0;
-    for (const match of value.matchAll(/\[来源 #(\d+)\]/g)) {
-      node.append(document.createTextNode(value.slice(start, match.index)));
-      const seq = Number(match[1]);
-      if (available.has(seq)) {
-        const button = document.createElement('button'); button.className = 'citation'; button.textContent = `来源 #${seq}`;
+    for (const match of value.matchAll(tokens)) {
+      parent.append(document.createTextNode(value.slice(start, match.index)));
+      const token = match[0], ref = /^\[来源 #(\d+)\]$/.exec(token);
+      if (ref && available.has(Number(ref[1]))) {
+        const button = document.createElement('button'); button.className = 'citation'; button.textContent = `来源 #${ref[1]}`;
         button.addEventListener('click', () => {
-          const source = element(`source-${seq}`); source.open = true;
+          const source = element(`source-${ref[1]}`); source.open = true;
           source.parentElement.closest('details').open = true;
           source.scrollIntoView({behavior: 'smooth', block: 'center'});
         });
-        node.append(button);
-      } else node.append(document.createTextNode(match[0]));
-      start = match.index + match[0].length;
+        parent.append(button);
+      } else if (ref) parent.append(document.createTextNode(token));
+      else {
+        const strong = token.startsWith('**');
+        const node = document.createElement(token.startsWith('`') ? 'code' : strong ? 'strong' : 'em');
+        node.textContent = token.slice(strong ? 2 : 1, strong ? -2 : -1); parent.append(node);
+      }
+      start = match.index + token.length;
     }
-    node.append(document.createTextNode(value.slice(start))); target.append(node);
+    parent.append(document.createTextNode(value.slice(start)));
   }
+  let list = null, listKind = null, quote = null, code = null, codeLines = [];
+  for (const line of body.replace(/\r\n/g, '\n').split('\n')) {
+    if (/^\s*```/.test(line)) {
+      list = null; quote = null;
+      if (code) {code.textContent = codeLines.join('\n'); code = null; codeLines = [];}
+      else {const pre = document.createElement('pre'); code = document.createElement('code'); pre.append(code); target.append(pre);}
+      continue;
+    }
+    if (code) {codeLines.push(line); continue;}
+    if (!line.trim()) {list = null; quote = null; continue;}
+    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    const bullet = /^\s*(?:([-+*])\s+|(\d+)[.)]\s+)(.*)$/.exec(line);
+    const cited = /^>\s?(.*)$/.exec(line);
+    if (heading) {
+      list = null; quote = null;
+      const node = document.createElement(heading[1].length <= 2 ? 'h3' : 'h4'); inline(node, heading[2]); target.append(node);
+    } else if (bullet) {
+      quote = null; const kind = bullet[2] ? 'ol' : 'ul';
+      if (!list || listKind !== kind) {list = document.createElement(kind); listKind = kind; if (kind === 'ol') list.setAttribute('start', bullet[2]); target.append(list);}
+      const node = document.createElement('li'); inline(node, bullet[3]); list.append(node);
+    } else if (cited) {
+      list = null;
+      if (!quote) {quote = document.createElement('blockquote'); target.append(quote);}
+      const node = document.createElement('p'); inline(node, cited[1]); quote.append(node);
+    } else {
+      list = null; quote = null;
+      const node = document.createElement(/^\s*(---+|\*\*\*+)\s*$/.test(line) ? 'hr' : 'p');
+      if (node.tagName !== 'HR') inline(node,line); target.append(node);
+    }
+  }
+  if (code) code.textContent = codeLines.join('\n');
 }
 element('summary-request').addEventListener('click', () => {
   if (!selected) return;
@@ -227,5 +261,13 @@ element('edit-record').addEventListener('click', () => {
 });
 element('query').addEventListener('keydown', event => {if (event.key === 'Enter') list().catch(e => status(e.message));});
 window.addEventListener('beforeunload', event => {if (dirty) {event.preventDefault(); event.returnValue = '';}});
-list().catch(e => status(e.message));
-captureStatus();
+if (location.protocol === 'file:') {
+  element('file-preview').hidden = false;
+  element('capture-status').textContent = '文件预览模式，未连接本地记录服务。';
+  element('list-status').textContent = '请使用 TAS Notes 启动入口读取记录。';
+  for (const id of ['query', 'search', 'refresh', 'refresh-capture']) element(id).disabled = true;
+  status('页面样式可预览；记录读取、编辑和下载需要本地服务。');
+} else {
+  list().catch(e => status(e.message));
+  captureStatus();
+}

@@ -19,33 +19,50 @@ def excerpt(value, limit=600):
 
 
 def readable(record):
-    parts = ['## 过程概览', '以下为自动摘录，尚未做语义整理。工具原文在来源中；未提供的理由未知，用户验收状态未判定。']
+    events = record['events']
+    count = lambda kind: sum(e['kind'] == kind for e in events)
+    parts = ['## 过程概览',
+             '- **记录范围**：%s 次用户输入 · %s 次工具操作 · %s 次 Agent 陈述。' %
+             (count('UserPromptSubmit'), count('PostToolUse'), count('Stop')),
+             '- **整理方式**：按事件组织的自动概览；尚未生成语义总结。',
+             '- **当前结论**：未自动判定解决或验收；未提供的理由仍未知。',
+             '## 工作经过']
     turn = 0
-    for event in record['events']:
+    for event in events:
         c = json.loads(event['content'])
         ref = f"[来源 #{event['seq']}]"
-        # Keep visible speech even if the host attaches it to a different event kind.
         if isinstance(c.get('prompt'), str):
             turn += 1
-            parts += [f'### 第 {turn} 轮 · 用户要求或反馈', f"用户原话摘录：{excerpt(c['prompt'], 1200)} {ref}"]
+            prompt = c['prompt']
+            if '\n## My request:' in prompt:
+                prompt = prompt.split('\n## My request:', 1)[1]
+            parts += [f'### 第 {turn} 轮 · 要求与进展',
+                      f'**用户要求 / 反馈** {ref}', '> ' + excerpt(prompt, 700)]
         if event['kind'] == 'PostToolUse':
             name = excerpt(c.get('tool_name'), 80) or '未命名工具'
-            parts.append(f'- 调用了 {name}。结果尚未核实；输入和返回见来源。{ref}')
-            if not any(c.get(k) not in (None, '', {}, []) for k in ('tool_response', 'tool_result')):
-                parts.append(f'- 工具返回缺失或为空，不能判断成功。{ref}')
+            parts.append(f'- **操作**：{name}。输入与返回见来源。{ref}')
+            if c.get('error'):
+                parts.append(f'- **异常信号**：来源带有错误字段，需核对影响。{ref}')
+            elif not any(c.get(k) not in (None, '', {}, []) for k in ('tool_response', 'tool_result')):
+                parts.append(f'- **结果缺口**：工具返回缺失或为空，不能判断成功。{ref}')
+            else:
+                parts.append(f'- **观察**：已捕获工具返回；未自动核实成功或失败。{ref}')
+        elif c.get('error'):
+            parts.append(f'- **异常信号**：来源带有错误字段，不能推断整个任务结果。{ref}')
         if isinstance(c.get('last_assistant_message'), str):
-            parts += ['### Agent 的说明（尚非独立验证）', f"Agent 原话摘录：{excerpt(c['last_assistant_message'], 1600)} {ref}"]
-        if c.get('error'):
-            parts.append(f'- 来源带有错误字段，请核对，不能由此推断整个任务结果。{ref}')
+            parts += [f'**Agent 反馈（待核实）** {ref}', '> ' + excerpt(c['last_assistant_message'], 1200)]
         if event['kind'] in ('Interrupt', 'PreCompact', 'PostCompact'):
             label = {'Interrupt': '任务中断', 'PreCompact': '上下文压缩前', 'PostCompact': '上下文压缩后'}[event['kind']]
-            parts.append(f'- {label}；本条没有可用的正文或原因。{ref}' if not any(k in c for k in ('message', 'reason'))
-                         else f'- {label}；详情见来源。{ref}')
+            detail = '本条没有可用的正文或原因' if not any(c.get(k) for k in ('message', 'reason')) else '详情见来源'
+            parts.append(f'- **过程节点**：{label}；{detail}。{ref}')
         if '\ufffd' in event['content']:
-            parts.append(f'- 材料可能已发生编码丢失，不猜测还原。{ref}')
+            parts.append(f'- **覆盖缺口**：材料可能已发生编码丢失。{ref}')
         if c.get('_coverage', {}).get('truncated_fields'):
-            parts.append(f'- 材料因大小限制截断，完整过程可能缺失。{ref}')
-    parts += ['## 待确认', '本版未提取结构化退出状态；回合结束、工具调用和 Agent 的完成陈述均不等于用户验收。缺失的理由需核对，不能编造。']
+            parts.append(f'- **覆盖缺口**：材料因大小限制截断。{ref}')
+    parts += ['## 待确认',
+              '- **结果**：本版未提取结构化退出状态，Agent 的完成陈述不等于独立验证。',
+              '- **理由与依据**：使用“获取 Codex 整理指令”生成有来源的总结；缺失的理由不能编造。',
+              '- **用户验收**：需由你核对并说明；人工保存也不自动表示验收通过。']
     return '\n\n'.join(parts)
 
 
