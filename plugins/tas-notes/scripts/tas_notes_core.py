@@ -1,4 +1,4 @@
-"""Local opt-in recording and versioned review, independent of the TAS service."""
+"""Opt-in local event storage and read-only historical archives."""
 from __future__ import annotations
 
 import argparse
@@ -17,10 +17,14 @@ MAX_INPUT = 512 * 1024
 MAX_FIELD = 32 * 1024
 MAX_SESSION_BYTES = 10 * 1024 * 1024
 MAX_DATABASE_BYTES = 256 * 1024 * 1024
+ERROR_RESERVE_BYTES = 512 * 1024
+ERROR_RESERVE_EVENTS = 128
 EVENTS = frozenset(('SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop',
                    'PreCompact', 'PostCompact', 'SessionEnd', 'Interrupt'))
 FIELDS = ('prompt', 'last_assistant_message', 'tool_name', 'tool_input',
-          'tool_response', 'tool_result', 'error', 'reason', 'source', 'message')
+          'tool_response', 'tool_result', 'error', 'reason', 'source', 'message',
+          'turn_id', 'tool_use_id', 'call_id', 'event_id', 'hook_event_id',
+          'exit_code', 'exitCode', 'returncode', 'status', 'success', 'isError')
 SENSITIVE = re.compile(r'authorization|password|passwd|secret|credential|api[_-]?key|access[_-]?token', re.I)
 
 
@@ -30,6 +34,12 @@ class NotesError(ValueError):
 
 class Conflict(NotesError):
     pass
+
+
+class CaptureLimit(NotesError):
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
 
 
 def now():
@@ -68,11 +78,11 @@ def clean(value, depth=0):
     raise NotesError('unsupported event value')
 
 
-def normalize(payload):
+def normalize(payload, adapter_version=2):
     if not isinstance(payload, dict):
         raise NotesError('hook input must be an object')
     if len(canonical(payload).encode('utf-8')) > MAX_INPUT:
-        raise NotesError('event exceeds size limit')
+        raise CaptureLimit('InputTooLarge')
     kind = payload.get('hook_event_name')
     if not isinstance(kind, str) or kind not in EVENTS:
         raise NotesError('unsupported hook event')
@@ -81,19 +91,32 @@ def normalize(payload):
         raise NotesError('ambiguous session identity')
     project = project_path(payload.get('cwd'))
     content, truncated = {}, []
-    for field in FIELDS:
+    for field in FIELDS if adapter_version == 2 else FIELDS[:10]:
         if field not in payload:
             continue
         value = clean(payload[field])
         encoded = canonical(value)
-        if len(encoded) > MAX_FIELD:
-            value = {'preview': encoded[:MAX_FIELD], 'truncated': True}
+        field_size = len(value) if adapter_version == 2 and isinstance(value, str) else len(encoded)
+        if field_size > MAX_FIELD:
+            if adapter_version == 2 and isinstance(value, str) and field in ('tool_response', 'tool_result', 'error'):
+                value = {'preview': value[:MAX_FIELD // 2], 'tail': value[-MAX_FIELD // 2:],
+                         'truncated': True, 'original_length': len(value)}
+            else:
+                value = {'preview': encoded[:MAX_FIELD], 'truncated': True}
             truncated.append(field)
         content[field] = value
     content['_coverage'] = {
         'source': 'codex_hook', 'truncated_fields': truncated,
         'transcript_read': False, 'independently_verified': False,
     }
+    if adapter_version == 2:
+        content['_coverage'].update({
+        'adapter_version': 2,
+        'unknown_field_count': len(set(payload) - set(FIELDS) - {
+            'hook_event_name', 'session_id', 'thread_id', 'cwd',
+            'transcript_path', 'permission_mode'}),
+        'status_contract': 'captured_without_interpretation',
+        })
     # Host event IDs are preferred. Repeated events without stable IDs are retained.
     id_fields = ('event_id', 'hook_event_id', 'tool_use_id', 'call_id') if kind == 'PostToolUse' else ('event_id', 'hook_event_id')
     identifier = None
@@ -121,16 +144,24 @@ def default_state():
 
 
 class Store:
-    def __init__(self, directory):
-        self.directory = Path(directory).resolve()
-        self.directory.mkdir(parents=True, exist_ok=True)
+    def __init__(self, directory, read_only=False):
+        self.directory = Path(directory).expanduser().resolve()
+        self.read_only = read_only
+        if not read_only:
+            self.directory.mkdir(parents=True, exist_ok=True)
         self.database = self.directory / 'notes.sqlite3'
         if self.database.is_symlink():
             raise NotesError('database symlinks are not supported')
         with self.connect() as db:
             if db.execute('PRAGMA user_version').fetchone()[0] not in (0, 1):
                 raise NotesError('unsupported database version')
+            if read_only:
+                return
+            # Existing complete stores open without DDL, including when full/read-only.
+            if db.execute("SELECT 1 FROM sqlite_master WHERE name='capture_usage'").fetchone():
+                return
             db.executescript('''
+                BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS projects (
                     path TEXT PRIMARY KEY, enabled INTEGER NOT NULL CHECK(enabled IN (0,1)));
                 CREATE TABLE IF NOT EXISTS investigations (
@@ -152,12 +183,31 @@ class Store:
                     id TEXT PRIMARY KEY, investigation TEXT NOT NULL REFERENCES investigations(id),
                     source_seq INTEGER NOT NULL, fingerprint TEXT NOT NULL,
                     content TEXT NOT NULL, created TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS capture_usage (
+                    investigation TEXT PRIMARY KEY REFERENCES investigations(id),
+                    bytes INTEGER NOT NULL, count INTEGER NOT NULL);
+                INSERT OR IGNORE INTO capture_usage
+                    SELECT investigation,SUM(length(CAST(content AS BLOB))),COUNT(*)
+                    FROM events GROUP BY investigation;
+                CREATE INDEX IF NOT EXISTS events_investigation_seq ON events(investigation,seq);
+                CREATE INDEX IF NOT EXISTS events_kind_seq ON events(kind,seq);
+                CREATE TRIGGER IF NOT EXISTS capture_usage_insert AFTER INSERT ON events BEGIN
+                    INSERT INTO capture_usage VALUES (NEW.investigation,length(CAST(NEW.content AS BLOB)),1)
+                    ON CONFLICT(investigation) DO UPDATE SET
+                        bytes=bytes+length(CAST(NEW.content AS BLOB)), count=count+1;
+                END;
+                CREATE TRIGGER IF NOT EXISTS capture_usage_delete AFTER DELETE ON events BEGIN
+                    UPDATE capture_usage SET bytes=bytes-length(CAST(OLD.content AS BLOB)),count=count-1
+                    WHERE investigation=OLD.investigation;
+                END;
                 PRAGMA user_version=1;
+                COMMIT;
             ''')
 
     @contextmanager
     def connect(self):
-        db = sqlite3.connect(self.database, timeout=3, isolation_level=None)
+        database = self.database.as_uri() + '?mode=ro' if self.read_only else self.database
+        db = sqlite3.connect(database, uri=self.read_only, timeout=3, isolation_level=None)
         db.row_factory = sqlite3.Row
         db.execute('PRAGMA foreign_keys=ON')
         try:
@@ -176,32 +226,83 @@ class Store:
         return {'project': path, 'enabled': bool(enabled)}
 
     def record(self, payload):
-        project, session, kind, key, body = normalize(payload)
-        digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
-        if self.database.stat().st_size > MAX_DATABASE_BYTES:
-            raise NotesError('local database limit reached')
+        # Opted-out projects do not acquire a writer lock or process their bodies.
+        if not isinstance(payload, dict):
+            raise NotesError('hook input must be an object')
+        project = project_path(payload.get('cwd'))
         with self.connect() as db:
-            db.execute('BEGIN IMMEDIATE')
             allowed = db.execute('SELECT enabled FROM projects WHERE path=?', (project,)).fetchone()
             if not allowed or not allowed['enabled']:
-                db.rollback()
                 return {'status': 'ignored', 'reason': 'project_not_enabled'}
-            row = db.execute('SELECT id FROM investigations WHERE project=? AND session=?', (project, session)).fetchone()
-            identifier = row['id'] if row else str(uuid4())
-            if not row:
-                db.execute('INSERT INTO investigations VALUES (?,?,?,?)', (identifier, project, session, now()))
-            previous = db.execute('SELECT digest FROM events WHERE investigation=? AND event_key=?', (identifier, key)).fetchone()
-            if previous:
-                if previous['digest'] != digest:
-                    raise Conflict('host event ID reused with different content')
-                db.rollback()
-                return {'status': 'duplicate', 'investigation': identifier}
-            size, count = db.execute('SELECT COALESCE(SUM(length(CAST(content AS BLOB))),0),COUNT(*) FROM events WHERE investigation=?', (identifier,)).fetchone()
-            if size + len(body.encode('utf-8')) > MAX_SESSION_BYTES or count >= 5000:
-                raise NotesError('session recording limit reached')
-            db.execute('INSERT INTO events(investigation,event_key,kind,content,digest,captured) VALUES (?,?,?,?,?,?)',
-                       (identifier, key, kind, body, digest, now()))
-            db.commit()
+        try:
+            return self._record_enabled(payload)
+        except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
+            # Normalization/connection errors happen before the writer section.
+            # Errors inside it already published their marker while serialized.
+            if not getattr(error, '_capture_diagnostic_recorded', False):
+                code = error.code if isinstance(error, CaptureLimit) else type(error).__name__
+                session = payload.get('session_id') or payload.get('thread_id')
+                diagnostic(self.directory, code, project, session if isinstance(session, str) else None)
+            raise
+
+    def _record_enabled(self, payload):
+        project, session, kind, key, body = normalize(payload)
+        from tas_notes_diagnostics import last_error
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                allowed = db.execute('SELECT enabled FROM projects WHERE path=?', (project,)).fetchone()
+                if not allowed or not allowed['enabled']:
+                    db.rollback()
+                    return {'status': 'ignored', 'reason': 'project_not_enabled'}
+                # Read gap state only after earlier writers have completed. A
+                # rejected boundary publishes its marker before releasing this lock.
+                if last_error(self.directory, project, session):
+                    content = json.loads(body)
+                    content['_coverage']['capture_gap_before'] = True
+                    body = canonical(content)
+                digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
+                row = db.execute('SELECT id FROM investigations WHERE project=? AND session=?', (project, session)).fetchone()
+                identifier = row['id'] if row else str(uuid4())
+                if not row:
+                    db.execute('INSERT INTO investigations VALUES (?,?,?,?)', (identifier, project, session, now()))
+                previous = db.execute('SELECT digest,content FROM events WHERE investigation=? AND event_key=?', (identifier, key)).fetchone()
+                if previous:
+                    if previous['digest'] != digest:
+                        old = json.loads(previous['content'])
+                        # A replay after the adapter upgrade must not conflict merely
+                        # because we now retain additional host metadata. Never rewrite old evidence.
+                        legacy = not old.get('_coverage', {}).get('adapter_version')
+                        unchanged = normalize(payload, adapter_version=1)[-1] == previous['content'] if legacy else False
+                        if not legacy:
+                            current = json.loads(body)
+                            for value in (old, current):
+                                value.get('_coverage', {}).pop('capture_gap_before', None)
+                            unchanged = old == current
+                        if not unchanged:
+                            raise Conflict('host event ID reused with different content')
+                    db.rollback()
+                    return {'status': 'duplicate', 'investigation': identifier}
+                if self.database.stat().st_size >= MAX_DATABASE_BYTES:
+                    raise CaptureLimit('DatabaseCapacityReached')
+                usage = db.execute('SELECT bytes,count FROM capture_usage WHERE investigation=?', (identifier,)).fetchone()
+                size, count = (usage['bytes'], usage['count']) if usage else (0, 0)
+                if size + len(body.encode('utf-8')) > MAX_SESSION_BYTES or count >= 5000:
+                    from tas_notes_anomalies import detect
+                    if (kind != 'PostToolUse' or not detect(json.loads(body))
+                            or size + len(body.encode('utf-8')) > MAX_SESSION_BYTES + ERROR_RESERVE_BYTES
+                            or count >= 5000 + ERROR_RESERVE_EVENTS):
+                        raise CaptureLimit('SessionCapacityReached')
+                db.execute('INSERT INTO events(investigation,event_key,kind,content,digest,captured) VALUES (?,?,?,?,?,?)',
+                           (identifier, key, kind, body, digest, now()))
+                db.commit()
+            except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
+                # The filesystem marker survives SQLite rollback. Publish before
+                # the connection releases its writer lock, not in record's outer catch.
+                code = error.code if isinstance(error, CaptureLimit) else type(error).__name__
+                diagnostic(self.directory, code, project, session)
+                error._capture_diagnostic_recorded = True
+                raise
         return {'status': 'recorded', 'investigation': identifier}
 
     def listing(self, query=''):
@@ -234,12 +335,22 @@ class Store:
                 seq = project.pop('last_seq')
                 event = db.execute('SELECT kind,captured,seq FROM events WHERE seq=?', (seq,)).fetchone()
                 project['last_recorded_event'] = dict(event) if event else None
+                project['last_capture_error'] = last_error(self.directory, project['path'])
             # Retain a bounded metadata-only records list for CLI compatibility.
             records = [dict(r) for r in db.execute('''SELECT i.id,i.project,COUNT(e.seq) AS event_count,
                 MAX(e.seq) AS source_seq FROM investigations i LEFT JOIN events e ON e.investigation=i.id
                 GROUP BY i.id ORDER BY source_seq DESC LIMIT 500''')]
             db.commit()
-        return {'status_version': 1, 'runtime': runtime_status(self.directory), 'projects': projects,
+        from tas_notes_launcher import runtime_metadata
+        application = runtime_metadata(self)
+        application['state_directory'] = application['state_dir']
+        size = self.database.stat().st_size
+        return {'status_version': 2, 'runtime': runtime_status(self.directory), 'projects': projects,
+                'application': application,
+                'storage': {'database_bytes': size, 'database_limit_bytes': MAX_DATABASE_BYTES,
+                            'capacity_reached': size >= MAX_DATABASE_BYTES,
+                            'session_limit_bytes': MAX_SESSION_BYTES,
+                            'error_reserve_bytes': ERROR_RESERVE_BYTES},
                 'record_count': sum(p['record_count'] for p in projects), 'records': records,
                 'last_capture_error': last_error(self.directory),
                 'host_integration': 'not_checked', 'continuous_capture': 'unknown'}
@@ -252,11 +363,14 @@ class Store:
             if not row:
                 raise NotesError('record not found')
             events = [dict(r) for r in db.execute('SELECT seq,kind,content,digest,captured FROM events WHERE investigation=? ORDER BY seq', (identifier,))]
-            revision = db.execute('SELECT * FROM revisions WHERE investigation=? ORDER BY number DESC LIMIT 1', (identifier,)).fetchone()
-            summary = db.execute('SELECT * FROM summaries WHERE investigation=? ORDER BY rowid DESC LIMIT 1', (identifier,)).fetchone()
+            revisions = [dict(r) for r in db.execute('SELECT * FROM revisions WHERE investigation=? ORDER BY number DESC', (identifier,))]
+            summaries = [dict(r) for r in db.execute('SELECT * FROM summaries WHERE investigation=? ORDER BY rowid DESC', (identifier,))]
+            revision = revisions[0] if revisions else None
+            summary = summaries[0] if summaries else None
             db.commit()
         result = dict(row)
         result.update(events=events, revision=dict(revision) if revision else None,
+                      revisions=revisions, summaries=summaries,
                       source_seq=events[-1]['seq'] if events else 0)
         first = next((e['content'] for e in events if e['kind'] == 'UserPromptSubmit'), None)
         result['display_title'] = result['revision']['title'] if revision else prompt_title(first) or f"调查 {identifier[:8]}"
@@ -266,79 +380,6 @@ class Store:
         result['overview'] = render_draft(result)
         result['draft'] = render_summary(result['summary']) if summary and not result['summary_stale'] else result['overview']
         return result
-
-    def summary_source(self, identifier, offset=0):
-        from tas_notes_summary import fingerprint, SECTIONS
-        if type(offset) is not int or offset < 0:
-            raise NotesError('invalid offset')
-        record = self.detail(identifier)
-        events = record['events']
-        return {'record_id': identifier, 'source_seq': record['source_seq'],
-                'fingerprint': fingerprint(events),
-                'expected_summary': record['summary']['id'] if record['summary'] else None,
-                'sections': list(SECTIONS), 'event_count': len(events),
-                'next_offset': offset + 10 if offset + 10 < len(events) else None,
-                'events': [dict(seq=e['seq'], kind=e['kind'],
-                                content_preview=e['content'][:3000],
-                                preview_truncated=len(e['content']) > 3000,
-                                content_length=len(e['content'])) for e in events[offset:offset + 10]]}
-
-    def summary_event(self, identifier, seq, start=0):
-        if type(seq) is not int or type(start) is not int or start < 0:
-            raise NotesError('invalid event cursor')
-        record = self.detail(identifier)
-        event = next((e for e in record['events'] if e['seq'] == seq), None)
-        if not event:
-            raise NotesError('source not found')
-        from tas_notes_summary import fingerprint
-        content = event['content']
-        return {'record_id': identifier, 'source_seq': record['source_seq'],
-                'fingerprint': fingerprint(record['events']), 'seq': seq,
-                'content_chunk': content[start:start+6000],
-                'next_start': start+6000 if start+6000 < len(content) else None}
-
-    def save_summary(self, payload):
-        from tas_notes_summary import validate
-        if not isinstance(payload, dict):
-            raise NotesError('invalid summary')
-        if len(canonical(payload).encode('utf-8')) > 800_000:
-            raise NotesError('summary too large')
-        if self.database.stat().st_size > MAX_DATABASE_BYTES:
-            raise NotesError('local database limit reached')
-        with self.connect() as db:
-            db.execute('BEGIN IMMEDIATE')
-            record = self.detail(payload.get('record_id'))
-            sections = validate(payload, record)
-            content = canonical(sections)
-            if len(content) > 100_000:
-                raise NotesError('summary too long')
-            identifier = str(uuid4())
-            db.execute('INSERT INTO summaries VALUES (?,?,?,?,?,?)',
-                       (identifier, record['id'], record['source_seq'], payload['fingerprint'], content, now()))
-            db.commit()
-        return {'id': identifier, 'source_seq': record['source_seq'], 'human_reviewed': False}
-
-    def save_revision(self, identifier, title, body, source_seq, expected_revision):
-        identifier = text(identifier, 'record id')
-        title = text(title, 'title', 200)
-        body = text(body, 'body', 200_000)
-        if type(source_seq) is not int or type(expected_revision) is not int:
-            raise NotesError('invalid revision cursor')
-        if self.database.stat().st_size > MAX_DATABASE_BYTES:
-            raise NotesError('local database limit reached')
-        with self.connect() as db:
-            db.execute('BEGIN IMMEDIATE')
-            current = db.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE investigation=?', (identifier,)).fetchone()[0]
-            version = db.execute('SELECT COALESCE(MAX(number),0) FROM revisions WHERE investigation=?', (identifier,)).fetchone()[0]
-            if not current:
-                raise NotesError('record not found')
-            if source_seq != current or expected_revision != version:
-                raise Conflict('record changed; refresh and reconcile before saving')
-            revision_id = str(uuid4())
-            db.execute('INSERT INTO revisions VALUES (?,?,?,?,?,?,?)',
-                       (revision_id, identifier, version + 1, current, title, body, now()))
-            db.commit()
-        return {'id': revision_id, 'number': version + 1}
 
     def export_revision(self, revision_id):
         revision_id = text(revision_id, 'revision id')
@@ -371,9 +412,11 @@ def render_draft(record):
     return readable(record)
 
 
-def diagnostic(directory, code):
+def diagnostic(directory, code, project=None, session=None):
     """Atomic, bounded, content-free last failure marker; recording stays fail-open."""
-    target = Path(directory) / 'last-error.json'
+    from tas_notes_diagnostics import marker_name
+    name = marker_name(project, session)
+    target = Path(directory) / name
     temporary = target.with_name(f'.diagnostic-{uuid4().hex}.tmp')
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -386,25 +429,26 @@ def diagnostic(directory, code):
             temporary.unlink(missing_ok=True)
         except OSError:
             pass
+    if session and project:
+        diagnostic(directory, code, project)
+    elif project:
+        diagnostic(directory, code)
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='TAS Notes: local records and human review')
+    parser = argparse.ArgumentParser(description='Blackbox Plugin: local execution errors and read-only archives')
     parser.add_argument('--state-dir', type=Path)
     commands = parser.add_subparsers(dest='command', required=True)
     for command in ('enable', 'disable'):
         commands.add_parser(command).add_argument('project')
     commands.add_parser('hook')
     commands.add_parser('status')
-    source = commands.add_parser('summary-source')
-    source.add_argument('record_id')
-    source.add_argument('--offset', type=int, default=0)
-    event = commands.add_parser('summary-event')
-    event.add_argument('record_id')
-    event.add_argument('seq', type=int)
-    event.add_argument('--start', type=int, default=0)
-    summary = commands.add_parser('summary-save')
-    summary.add_argument('source_file', type=Path)
+    commands.add_parser('stop')
+    backup_parser = commands.add_parser('backup')
+    backup_parser.add_argument('destination', type=Path)
+    restore_parser = commands.add_parser('restore')
+    restore_parser.add_argument('source', type=Path)
+    restore_parser.add_argument('destination', type=Path)
     commands.add_parser('configure-runtime')
     opener = commands.add_parser('open')
     opener.add_argument('--no-browser', action='store_true')
@@ -418,8 +462,17 @@ def main(argv=None):
     args = parser.parse_args(argv)
     directory = None
     try:
-        directory = args.state_dir or default_state()
-        store = Store(directory)
+        if args.command == 'restore':
+            from tas_notes_backup import restore
+            print(json.dumps(restore(args.source, args.destination), ensure_ascii=True, indent=2))
+            return 0
+        from tas_notes_launcher import resolve_state_directory
+        directory = resolve_state_directory(args.state_dir)
+        if args.command == 'hook' and not (directory / 'notes.sqlite3').is_file():
+            # Installation alone has no authorization and need not create a database.
+            return 0
+        store = Store(directory, read_only=args.command in ('status', 'open', 'serve', 'export', 'backup', 'stop')
+                      and (directory / 'notes.sqlite3').is_file())
         if args.command == 'configure-runtime':
             # The .cmd bootstrap does not require changing PowerShell execution policy.
             # Restrict cmd metacharacters and use an ASCII short path for Windows codepages.
@@ -439,20 +492,16 @@ def main(argv=None):
         elif args.command == 'hook':
             raw = sys.stdin.buffer.read(MAX_INPUT + 1)
             if len(raw) > MAX_INPUT:
-                raise NotesError('hook input exceeds limit')
+                raise CaptureLimit('InputTooLarge')
             result = store.record(json.loads(raw.decode('utf-8-sig')))
             # Never inject captured text or additional instructions into the Agent.
             return 0
-        elif args.command == 'summary-source':
-            result = store.summary_source(args.record_id, args.offset)
-        elif args.command == 'summary-event':
-            result = store.summary_event(args.record_id, args.seq, args.start)
-        elif args.command == 'summary-save':
-            with args.source_file.open('rb') as stream:
-                raw = stream.read(800_001)
-            if len(raw) > 800_000:
-                raise NotesError('summary too large')
-            result = store.save_summary(json.loads(raw.decode('utf-8-sig')))
+        elif args.command == 'backup':
+            from tas_notes_backup import backup
+            result = backup(store, args.destination)
+        elif args.command == 'stop':
+            from tas_notes_launcher import stop_reviewer
+            result = stop_reviewer(store)
         elif args.command == 'open':
             from tas_notes_launcher import ensure_reviewer
             result = ensure_reviewer(store)
@@ -462,8 +511,8 @@ def main(argv=None):
                     raise NotesError('default browser unavailable')
         elif args.command == 'serve':
             if args.background:
-                from tas_notes_launcher import background
-                result = background(store)
+                from tas_notes_launcher import ensure_reviewer
+                result = ensure_reviewer(store)
             else:
                 from tas_notes_web import serve
                 serve(store, args.ready_file)
@@ -479,7 +528,11 @@ def main(argv=None):
         return 0
     except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
         # Do not print exception text: it can contain input, SQL or filesystem secrets.
-        print(f'TAS Notes: {type(error).__name__}; operation not completed.', file=sys.stderr)
+        code = error.code if isinstance(error, CaptureLimit) else type(error).__name__
+        if getattr(error, 'public_code', None) == 'reviewer_build_changed':
+            print('Blackbox Plugin: reviewer_build_changed; run stop, then open. Preserve any old unsaved edits first.', file=sys.stderr)
+        else:
+            print(f'Blackbox Plugin: {code}; operation not completed.', file=sys.stderr)
         if args.command == 'hook' and directory is not None:
-            diagnostic(directory, type(error).__name__)
+            diagnostic(directory, code)
         return 0 if args.command == 'hook' else 1

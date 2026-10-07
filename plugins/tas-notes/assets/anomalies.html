@@ -2,18 +2,18 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TAS Notes · 执行异常</title>
+  <title>Blackbox Plugin · 执行异常</title>
   <link rel="stylesheet" href="./review.css"><script src="./anomalies.js" defer></script>
 </head>
 <body>
-  <header><div class="brand">TAS Notes <span>执行异常 · 本地记录</span></div><p>保留工具返回的错误和后续相关操作，无需人工确认。</p><a id="history" href="./history">历史会话与人工版本</a></header>
-  <section id="file-preview" hidden class="notice"><strong>当前是页面文件预览。</strong><p>请双击桌面或开始菜单的 TAS Notes 打开本地记录服务。</p></section>
+  <header><div class="brand">Blackbox Plugin <span>执行异常 · 本地记录</span></div><p>保留工具返回的错误和同参数后续调用，无需人工确认。</p><a id="history" href="./history">历史会话与人工版本（只读）</a></header>
+  <section id="file-preview" hidden class="notice"><strong>当前是页面文件预览。</strong><p>请双击桌面或开始菜单的 Blackbox Plugin 打开本地记录服务。</p></section>
   <section class="capture" aria-label="记录范围">
     <h2>记录范围</h2>
     <p>当前只收紧展示：已启用项目的普通输入、工具事件和最后回复仍可能保存在本机。未删除历史数据。</p>
-    <p class="muted">仅识别已验证的终端错误格式；未暴露的退出状态、内部重试及拒绝可能漏记。空返回不表示成功，未发现异常不代表没有问题。</p>
+    <p class="muted">当前筛选 Bash 返回中的完整 Python traceback 和指定 PowerShell 诊断格式。已保存的退出状态等字段尚未经过宿主契约验证，不单独用于判错；其他工具和格式可能漏记。空返回不表示成功，未发现异常不代表没有问题。</p>
     <p id="capture-status" role="status">正在读取本地采集状态…</p>
-    <details><summary>采集状态与历史诊断</summary><div id="capture-projects"></div><p id="capture-error" class="muted"></p><p class="muted">历史落盘不能证明当前持续采集。完整诊断可从历史会话入口查看。</p></details>
+    <details><summary>采集状态、容量与运行版本</summary><p id="runtime-status" class="muted"></p><p id="application-status" class="muted"></p><p id="storage-status"></p><div id="capture-projects"></div><p id="capture-error" class="muted"></p><p class="muted">历史落盘不能证明当前持续采集。停止阅读服务不会停用项目采集；再次双击入口可重启。</p><button id="shutdown">停止本地阅读服务</button></details>
   </section>
   <main>
     <aside aria-label="异常列表">
@@ -30,11 +30,11 @@
       <div id="empty"><h2>查看执行中出现过的错误</h2><p>后续重试不会抹掉先前失败。这里不判断根因、责任或整体任务是否修复。</p></div>
       <div id="detail" hidden>
         <h2 id="record-heading"></h2><p id="meta" class="muted"></p>
-        <p class="notice">按返回格式识别的观察记录，不是独立验证的 Bug。后续操作仅按相同会话、工具及完整参数关联，不推断处理意图。</p>
+        <p class="notice">按错误格式识别的观察记录，不是独立验证的 Bug。同参数后续调用只在已捕获的回合边界内匹配相同会话、工具及完整参数，不推断处理意图或修复结果。</p>
         <div class="actions"><button id="export" class="primary">下载当前记录 Markdown</button><a id="session" href="./history">查看历史会话</a></div>
         <article id="reading" aria-label="异常事实"></article>
-        <details><summary>原始参数、返回与覆盖标记</summary><div id="events"></div></details>
-        <p class="muted">下载与当前打开的快照一致；刷新后才包含新增材料。没有上传或 Git 推送。分享前请检查敏感信息。</p>
+        <details><summary>已保存的参数、返回与覆盖标记</summary><div id="events"></div></details>
+        <p class="muted">下载与当前打开的快照一致；刷新列表并重新打开记录后才包含新增材料。没有上传或 Git 推送。分享前请检查敏感信息。</p>
       </div>
     </section>
   </main>

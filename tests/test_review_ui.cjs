@@ -23,38 +23,81 @@ function harness(filePreview=false) {
   vm.runInContext(filePreview ? source : source.slice(0,source.indexOf("if (location.protocol === 'file:')")),context);
   return {context,get,downloads,run:s=>vm.runInContext(s,context)};
 }
-function record(draft='draft') { return {id:'a',project:'test',display_title:'title',draft,overview:'overview',events:[],source_seq:0}; }
+function record() { return {id:'a',project:'test',display_title:'title',overview:'overview',events:[],source_seq:0}; }
 test('download retains original record and revision when selection changes mid-request', async()=>{
   const h=harness(); let resolve;
   h.context.fetch=()=>new Promise(r=>{resolve=r;});
-  h.run("selected={id:'a',revision:{id:'rev-a',number:1}}");
+  h.run("selected={id:'a'};selectedRevision={id:'rev-a',number:1}");
   const pending=h.run('exportSaved()');
-  h.run("selected={id:'b',revision:{id:'rev-b',number:9}}");
+  h.run("selected={id:'b'};selectedRevision={id:'rev-b',number:9}");
   resolve({ok:true,blob:async()=>({})}); await pending;
   assert.deepEqual(h.downloads,['investigation-a-v1.md']);
 });
-test('oversize draft leaves editor empty, never saves guidance as content', async()=>{
-  const h=harness(); let posts=0;
-  h.context.fetch=async(_url,opts)=>{if(opts.method==='POST') posts++; return {ok:true,json:async()=>record('x'.repeat(200001))};};
+test('every historical revision remains readable and exportable without a write workflow', async()=>{
+  const h=harness();let posts=0, exportUrl;
+  const data=record();data.revisions=[{id:'one',number:1,title:'old title',body:'first saved text',source_seq:1},
+    {id:'two',number:2,title:'new title',body:'second saved text',source_seq:2}];
+  h.context.fetch=async(url,opts)=>{if(opts.method==='POST') posts++;exportUrl=url;return {ok:true,json:async()=>data,blob:async()=>({})};};
   await h.run("openRecord('a')");
-  assert.equal(h.get('body').value,'');
-  assert.match(h.get('editor-help').textContent,/超过/);
-  await h.run('save()'); assert.equal(posts,0);
+  assert.equal(h.get('revision').children.length,3);
+  assert.equal(h.run('selectedRevision.id'),'two');
+  h.run("selectRevision('one')");assert.equal(h.get('record-heading').textContent,'old title');
+  assert.equal(h.get('export').disabled,false);
+  await h.run('exportSaved()');assert.equal(exportUrl,'/api/export/one');
+  assert.deepEqual(h.downloads,['investigation-a-v1.md']);
+  h.run("selectRevision('')");assert.equal(h.get('export').disabled,true);
+  assert.equal(h.run('typeof save'),'undefined');assert.equal(posts,0);
+  const html=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/review.html'),'utf8');
+  assert.doesNotMatch(html,/<textarea|id="save"|id="summary-request"|id="editor"/);
+  assert.doesNotMatch(source,/api\/revisions|api\/summar|beforeunload/);
 });
-test('edits made during slow record opening are preserved', async()=>{
-  const h=harness(); let resolve;
-  h.context.fetch=()=>new Promise(r=>{resolve=r;});
-  const pending=h.run("openRecord('a')");
-  h.get('body').value='new unsaved work'; h.run('editSequence++; dirty=true;');
-  resolve({ok:true,json:async()=>record()}); await pending;
-  assert.equal(h.get('body').value,'new unsaved work');
-  assert.equal(h.run('dirty'),true);
+test('all saved model summaries remain readable and distinct from original events', async()=>{
+  const h=harness(), data=record();
+  const content=JSON.stringify([{heading:'historical heading',items:[{text:'unverified explanation <img src=x>',sources:[{seq:1,quote:'original observation'}]}]}]);
+  data.summaries=[{id:'s1',created:'2026-10-07',source_seq:1,content},{id:'s2',source_seq:2,content}];
+  h.context.fetch=async()=>({ok:true,json:async()=>data});await h.run("openRecord('a')");
+  assert.equal(h.get('summaries').children.length,2);
+  for(const entry of h.get('summaries').children) {
+    assert.match(entry.children[1].textContent,/并非原始观察/);
+    assert.match(entry.children[2].textContent,/original observation/);
+    assert.equal(entry.children[2].tagName,'PRE');
+  }
 });
-test('empty search and list refresh cannot overwrite editor status', async()=>{
-  const h=harness(); h.get('query').value='missing'; h.get('status').textContent='save conflict';
+test('late opening and search responses cannot overwrite the newest selection', async()=>{
+  const h=harness(), pending=[];
+  h.context.fetch=()=>new Promise(resolve=>pending.push(resolve));
+  const first=h.run("openRecord('a')"),second=h.run("openRecord('b')");
+  pending[1]({ok:true,json:async()=>({...record(),id:'b',display_title:'second'})});await second;
+  pending[0]({ok:true,json:async()=>record()});await first;
+  assert.equal(h.run('selected.id'),'b');assert.equal(h.get('record-heading').textContent,'second');
+  const oldList=h.run('list()'),newList=h.run('list()');
+  pending[3]({ok:true,json:async()=>[]});await newList;
+  pending[2]({ok:true,json:async()=>[{id:'a',display_title:'stale'}]});await oldList;
+  assert.equal(h.get('records').children.length,0);
+});
+test('late failed history requests do not replace a newer successful result', async()=>{
+  for(const [first,second,data] of [["openRecord('a')","openRecord('b')",{...record(),id:'b'}],['list()','list()',[]]]) {
+    const h=harness(), pending=[];
+    h.context.fetch=()=>new Promise((resolve,reject)=>pending.push({resolve,reject}));
+    const old=h.run(first),fresh=h.run(second);
+    pending[1].resolve({ok:true,json:async()=>data});await fresh;
+    pending[0].reject(new Error('old failure'));await assert.doesNotReject(old);
+  }
+});
+test('history exposes session capture gaps and project-specific diagnostic markers', async()=>{
+  const h=harness(), data=record();
+  data.events=[{seq:1,kind:'PostToolUse',content:JSON.stringify({_coverage:{capture_gap_before:true}})}];
+  h.context.fetch=async()=>({ok:true,json:async()=>data});await h.run("openRecord('a')");
+  assert.match(h.get('status').textContent,/已知采集缺口/);
+  h.context.fetch=async()=>({ok:true,json:async()=>({record_count:1,projects:[{path:'D:/project',enabled:true,last_capture_error:{code:'SessionCapacityReached'}}]})});
+  await h.run('captureStatus()');
+  assert.ok(h.get('capture-projects').children.some(node=>/SessionCapacityReached/.test(node.textContent)));
+});
+test('empty search and list refresh preserve reader status', async()=>{
+  const h=harness(); h.get('query').value='missing'; h.get('status').textContent='reading version 1';
   await h.run('list()');
   assert.match(h.get('list-status').textContent,/没有匹配/);
-  assert.equal(h.get('status').textContent,'save conflict');
+  assert.equal(h.get('status').textContent,'reading version 1');
   assert.equal(h.run('dateLabel(null)'),'时间未知');
 });
 test('file preview explains launcher and disables unavailable actions',()=>{

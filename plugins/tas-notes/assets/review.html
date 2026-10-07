@@ -2,48 +2,42 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TAS Notes · 本地审阅</title>
+  <title>Blackbox Plugin · 历史归档</title>
   <link rel="stylesheet" href="./review.css"><script src="./review.js" defer></script>
 </head>
 <body>
-  <header><div class="brand">TAS Notes <span>历史会话与人工版本</span></div><p>旧记录和可选的整理功能保留在这里，不是异常记录的必经步骤。</p><a id="anomalies-home" href="./">返回执行异常</a></header>
-  <section id="file-preview" hidden class="notice" role="status"><strong>当前是页面文件预览，不是记录服务。</strong><p>请双击桌面或开始菜单里的「TAS Notes」，或者在 Codex 中说“打开 TAS Notes 记录”。直接打开 HTML 不能读取或保存记录。</p></section>
+  <header><div class="brand">Blackbox Plugin <span>历史会话与人工版本 · 只读归档</span></div><p>保留已有来源、历史总结和每个人工版本；不再生成或编辑旧整理工作流的内容。</p><a id="anomalies-home" href="./">返回执行异常与运行状态</a></header>
+  <section id="file-preview" hidden class="notice" role="status"><strong>当前是页面文件预览，不是记录服务。</strong><p>请双击桌面或开始菜单里的「Blackbox Plugin」，或者在 Codex 中说“打开 Blackbox Plugin 记录”。直接打开 HTML 不能读取记录。</p></section>
   <section class="capture" aria-label="采集状态">
     <div class="capture-heading"><h2>采集状态</h2><button id="refresh-capture">刷新状态</button></div>
     <p id="capture-status" role="status">正在读取本地配置…</p>
     <p class="muted">这里显示本地配置和已保存的历史。插件是否安装、Hook 是否信任及当前是否持续投递，仍需在 Codex 中核对。</p>
-    <div id="capture-projects"></div><p id="capture-help" class="muted"></p>
-    <details id="capture-history" hidden><summary>历史诊断（不代表当前故障）</summary><p id="capture-error" class="muted" hidden></p></details>
+    <div id="capture-projects"></div><p id="capture-error" class="muted"></p>
   </section>
   <main>
-    <aside aria-label="调查记录">
-      <h1>调查记录</h1>
+    <aside aria-label="历史会话">
+      <h1>历史会话</h1>
       <label for="query">查找标题或项目</label>
       <div class="search"><input id="query" type="search" maxlength="200"><button id="search">查找</button></div>
-      <p class="muted">最多显示最近 500 条；列表不会自动刷新，避免打断编辑。</p>
+      <p class="muted">最多显示最近 500 条会话；手动刷新查看新增来源。</p>
       <button id="refresh">刷新列表</button><p id="list-status" role="status"></p><div id="records"></div>
     </aside>
     <section aria-label="记录详情">
-      <p id="status" role="status" aria-live="polite">选择记录后可阅读、编辑和下载。</p>
-      <div id="empty"><h2>从列表选择一份记录</h2><p>显示已捕获的本地材料，停用项目的历史也会保留。自动草稿与人工版本分开保存。</p></div>
+      <p id="status" role="status" aria-live="polite">选择会话后可阅读历史来源、总结及人工版本。</p>
+      <div id="empty"><h2>从列表选择一份记录</h2><p>停用项目的历史也会保留。自动摘录、模型总结与人工版本分别展示。</p></div>
       <div id="detail" hidden>
-        <h2 id="record-heading">调查记录</h2><p id="meta" class="muted"></p>
-        <p class="notice">回合结束不代表问题解决。保存人工版本也不表示验收通过或已发布。</p>
-        <p class="muted">记录可能有缺口：本版不提取结构化工具退出状态；没有会话结束事件也不能说明任务还在运行。请展开草稿核对空返回、缺失正文与可能的编码丢失。</p>
-        <p id="record-summary" class="muted"></p>
-        <p id="draft-state" class="notice"></p>
-        <div class="actions"><button id="edit-record" class="primary">编辑人工版本</button><button id="export" disabled>下载已保存版本</button><button id="summary-request">获取 Codex 整理指令</button><button id="use-draft">用当前草稿开始编辑</button></div>
-        <textarea id="summary-prompt" rows="3" readonly hidden aria-label="复制到 Codex 的整理指令"></textarea>
+        <h2 id="record-heading">历史会话</h2><p id="meta" class="muted"></p>
+        <p class="notice">回合结束不代表问题解决。历史模型解释和人工结论均不等于独立验证。</p>
+        <label for="revision">选择阅读版本</label><select id="revision"></select>
+        <p id="reading-state" class="notice"></p>
+        <div class="actions"><button id="export" disabled>下载所选人工版本</button></div>
         <article id="reading" aria-label="过程记录"></article>
-        <details><summary>自动摘录与覆盖缺口</summary><pre id="draft"></pre></details>
+        <details><summary>已保存的全部历史模型总结</summary><div id="summaries"></div></details>
         <details><summary>查看捕获的事件与来源</summary><div id="events"></div></details>
-        <details id="editor"><summary>审阅与编辑人工版本</summary><p id="editor-help" class="muted"></p><label for="title">人工版本标题</label><input id="title" maxlength="200">
-        <label for="body">审阅与编辑（Markdown）</label><textarea id="body" rows="20" maxlength="200000"></textarea>
-        <div class="actions"><button id="save" class="primary">保存人工版本</button><button id="export-editor" disabled>下载已保存版本</button></div><p id="editor-status" role="status" aria-live="polite"></p>
-        </details><p class="muted">下载仅包含上次保存的人工版本。新增事件和未保存的编辑不会被悄悄加入。</p>
+        <p class="muted">人工版本可分别导出；下载保持所选版本，不混入新增事件。页面仅展示已保存的来源，内容可能经过脱敏、截断或编码替换。</p>
       </div>
     </section>
   </main>
-  <footer>无 TAS 云端上传 · 整理使用当前 Codex 用量；无后台模型调用 · 不自动提交或推送 Git · 来源缺失与采集间隙仍可能存在</footer>
+  <footer>本地只读归档 · 无模型调用 · 不自动上传或推送 · 来源缺失与采集间隙仍可能存在</footer>
 </body>
 </html>

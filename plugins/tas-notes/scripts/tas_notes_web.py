@@ -8,9 +8,10 @@ from pathlib import Path
 import secrets
 import sqlite3
 import time
+import threading
 from urllib.parse import parse_qs, urlsplit
 
-from tas_notes_core import Conflict, NotesError
+from tas_notes_core import NotesError
 
 
 ASSETS = Path(__file__).resolve().parent.parent / 'assets'
@@ -18,8 +19,8 @@ ASSETS = Path(__file__).resolve().parent.parent / 'assets'
 
 def make_server(store, token=None):
     token = token or secrets.token_urlsafe(32)
-    from tas_notes_launcher import build_id
-    build = build_id()
+    from tas_notes_launcher import runtime_metadata
+    runtime = runtime_metadata(store)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -95,20 +96,21 @@ def make_server(store, token=None):
                     name, mime = static[request.path]
                     self.send(200, (ASSETS / name).read_bytes(), mime)
                 elif request.path == '/api/health':
-                    self.send(200, {'service': 'tas-notes-review', 'protocol': 1,
-                                    'pid': os.getpid(), 'build': build})
+                    self.send(200, runtime)
                 elif request.path == '/favicon.ico':
                     self.send(204, b'', 'image/x-icon')
                 elif request.path == '/api/records':
                     query = parse_qs(request.query).get('q', [''])[0]
                     self.send(200, store.listing(query))
                 elif request.path == '/api/status':
-                    self.send(200, store.status())
+                    value = store.status()
+                    value['application'] = dict(runtime, state_directory=runtime['state_dir'])
+                    self.send(200, value)
                 elif request.path == '/api/anomalies':
                     from tas_notes_anomalies import listing
                     query = parse_qs(request.query)
                     self.send(200, listing(store, **{key: query.get(key, [''])[0]
-                        for key in ('project', 'tool', 'start', 'end', 'before')}))
+                        for key in ('project', 'tool', 'start', 'end', 'before', 'through')}))
                 elif request.path.startswith('/api/anomaly/') or request.path.startswith('/api/anomaly-export/'):
                     from tas_notes_anomalies import detail, RULE_VERSION
                     query = parse_qs(request.query)
@@ -134,33 +136,20 @@ def make_server(store, token=None):
         def do_POST(self):
             if not self.check(True):
                 return
-            if self.path != '/api/revisions':
+            if self.path == '/api/revisions':
+                self.send(410, {'error': 'history_is_read_only'})
+                return
+            if self.path != '/api/shutdown':
                 self.send(404, {'error': 'not_found'})
                 return
-            if self.headers.get('Content-Type') != 'application/json':
-                self.send(415, {'error': 'json_required'})
+            if (self.headers.get('Transfer-Encoding')
+                    or len(self.headers.get_all('Content-Length', [])) > 1
+                    or self.headers.get('Content-Length', '0') != '0'):
+                self.send(400, {'error': 'shutdown_requires_empty_body'})
                 return
-            try:
-                if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length', [])) != 1:
-                    raise NotesError('invalid framing')
-                length = int(self.headers.get('Content-Length', '0'))
-                if not 0 < length <= 900_000:
-                    raise NotesError('invalid length')
-                self.connection.settimeout(5)
-                raw = self.rfile.read(length)
-                self.body_consumed = True
-                payload = json.loads(raw)
-                if not isinstance(payload, dict) or set(payload) != {'id', 'title', 'body', 'source_seq', 'expected_revision'}:
-                    raise NotesError('invalid fields')
-                result = store.save_revision(payload['id'], payload['title'], payload['body'],
-                                             payload['source_seq'], payload['expected_revision'])
-                self.send(200, result)
-            except Conflict:
-                self.send(409, {'error': 'changed_since_open'})
-            except (NotesError, ValueError, TypeError, OSError, RecursionError):
-                self.send(400, {'error': 'invalid_request'})
-            except sqlite3.Error:
-                self.send(503, {'error': 'local_store_unavailable'})
+            self.body_consumed = True
+            self.send(200, {'stopping': True})
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
 
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     server.daemon_threads = True

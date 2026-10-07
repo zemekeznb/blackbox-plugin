@@ -187,7 +187,7 @@ def main():
         selected = [hook for entry in hooks['data'] for hook in entry.get('hooks', [])
                     if (hook.get('pluginId') or '').startswith('tas-notes@')]
         if len(selected) != 8 or any(h.get('trustStatus') != 'trusted' or not h.get('enabled') for h in selected):
-            raise RuntimeError('TAS Notes requires normal installation and explicit hook trust first')
+            raise RuntimeError('Blackbox Plugin requires normal installation and explicit hook trust first')
         reply = rpc.request('thread/start', {'cwd': str(project), 'ephemeral': True,
                             'sandbox': 'read-only', 'approvalPolicy': 'never'})
         thread_id = reply['thread']['id']
@@ -253,8 +253,6 @@ def main():
             report['assertions']['failed_tool_observed'] = any(c['status'] == 'failed' for c in rpc.commands)
         if args.phase == 'flow' and rows:
             detail = store.detail(rows[0]['id'])
-            review = store.save_revision(detail['id'], 'Synthetic review', 'Owner review before correction',
-                                         detail['source_seq'], 0)
             report['turns'].append(rpc.turn(thread_id,
                 '这是隔离测试，请只读当前目录的 fixture.txt，然后分别执行两条无副作用命令：'
                 'cmd.exe /d /c exit 7 和 cmd.exe /d /c echo TAS_NOTES_TOOL_OK。'
@@ -274,8 +272,6 @@ def main():
             report['limitations'] = {'tool_replacement_character_observed': any(
                 '\ufffd' in str(c.get('tool_response', '')) for c in contents),
                 'exit_status_not_in_current_stored_fields': True}
-            report['assertions']['human_revision_preserved'] = updated['revision']['body'] == 'Owner review before correction'
-            report['assertions']['export_frozen'] = '还是有问题' not in store.export_revision(review['id'])
             report['assertions']['correction_captured'] = '还是有问题' in updated['draft']
             before = len(updated['events'])
             store.set_project(str(project), False)

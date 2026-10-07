@@ -16,7 +16,16 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / 'plugins/tas-notes/scripts'
 sys.path.insert(0, str(SCRIPTS))
 from tas_notes_core import Store, NotesError, Conflict, normalize, MAX_INPUT, MAX_FIELD
+from uuid import uuid4
 from tas_notes_web import make_server
+
+
+def legacy_revision(store, identifier, title, body, seq, number=1):
+    revision_id = str(uuid4())
+    with store.connect() as db:
+        db.execute('INSERT INTO revisions VALUES (?,?,?,?,?,?,?)',
+                   (revision_id, identifier, number, seq, title, body, '2026-10-07T00:00:00+00:00'))
+    return {'id': revision_id, 'number': number}
 
 
 class StoreTests(unittest.TestCase):
@@ -91,7 +100,7 @@ class StoreTests(unittest.TestCase):
     def test_human_revision_survives_later_correction_and_export_is_fixed(self):
         identifier = self.capture()
         first = self.store.detail(identifier)
-        revision = self.store.save_revision(identifier, '人工标题', '人工正文', first['source_seq'], 0)
+        revision = legacy_revision(self.store, identifier, '人工标题', '人工正文', first['source_seq'])
         event = self.event()
         event.update(hook_event_name='UserPromptSubmit', prompt='还是有问题', event_id='user-2')
         self.store.record(event)
@@ -99,12 +108,9 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(updated['revision']['body'], '人工正文')
         self.assertIn('还是有问题', updated['draft'])
         self.assertNotIn('还是有问题', self.store.export_revision(revision['id']))
-        with self.assertRaises(Conflict):
-            self.store.save_revision(identifier, '覆盖', '过时', first['source_seq'], 1)
-        with self.assertRaises(Conflict):
-            self.store.save_revision(identifier, '覆盖', '过时', updated['source_seq'], 0)
-        self.store.save_revision(identifier, '新版', '补充用户反馈', updated['source_seq'], 1)
+        legacy_revision(self.store, identifier, '新版', '补充用户反馈', updated['source_seq'], 2)
         self.assertIn('人工正文', self.store.export_revision(revision['id']))
+        self.assertEqual(len(self.store.detail(identifier)['revisions']), 2)
 
     def test_redaction_truncation_and_no_transcript_read(self):
         event = self.event(tool_input={'api_key': 'secret-value', 'safe': 'Bearer abcdefghijkl',
@@ -181,7 +187,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(row['title_source'], 'first_prompt')
         detail = self.store.detail(identifier)
         self.assertEqual(detail['display_title'], row['display_title'])
-        revision = self.store.save_revision(identifier, '人工标题', '人工正文', detail['source_seq'], 0)
+        revision = legacy_revision(self.store, identifier, '人工标题', '人工正文', detail['source_seq'])
         frozen = self.store.export_revision(revision['id'])
         self.store.record(dict(cwd=str(self.project), session_id='title-test',
             hook_event_name='UserPromptSubmit', prompt='还是有问题'))
@@ -256,7 +262,7 @@ class StoreTests(unittest.TestCase):
         identifier = records[0]['id']
         detail = self.store.detail(identifier)
         self.assertIn('中文用户材料', detail['draft'])
-        revision = self.store.save_revision(identifier, '中文', '正文', detail['source_seq'], 0)
+        revision = legacy_revision(self.store, identifier, '中文', '正文', detail['source_seq'])
         destination = self.project / 'reviewed.md'
         self.assertEqual(self.cli('export', revision['id'], str(destination)).returncode, 0)
         self.assertEqual(self.cli('export', revision['id'], str(destination)).returncode, 1)
@@ -327,7 +333,7 @@ class WebTests(unittest.TestCase):
         connection.request('POST', '/api/revisions', body=b'[' * 2000 + b'0' + b']' * 2000,
                            headers={'Content-Type':'application/json','Authorization':'Bearer '+self.token})
         response = connection.getresponse()
-        self.assertEqual(response.status, 400)
+        self.assertEqual(response.status, 410)
         response.read()
         self.assertEqual(self.request('/favicon.ico', auth=False)[0], 204)
         self.assertIsNone(self.store.detail(self.identifier)['revision'])
@@ -366,23 +372,16 @@ class WebTests(unittest.TestCase):
             self.assertTrue(data)
             self.assertIn(mime,headers['Content-Type'])
 
-    def test_save_export_and_stale_conflict(self):
+    def test_history_writes_retired_but_every_old_revision_exports(self):
         detail = self.store.detail(self.identifier)
-        body = {'id': self.identifier, 'title': '标题', 'body': '已审阅正文',
-                'source_seq': detail['source_seq'], 'expected_revision': 0}
-        code, raw, _ = self.request('/api/revisions', 'POST', body)
-        self.assertEqual(code, 200)
-        revision = json.loads(raw)
-        self.assertEqual(self.request('/api/revisions', 'POST', body)[0], 409)
-        code, raw, _ = self.request('/api/export/' + revision['id'])
-        self.assertEqual(code, 200)
-        self.assertIn('已审阅正文', raw.decode('utf-8'))
-
-    def test_malformed_revision_types_are_rejected(self):
-        body = {'id': [], 'title': 'title', 'body': 'body', 'source_seq': 1, 'expected_revision': 0}
-        self.assertEqual(self.request('/api/revisions', 'POST', body)[0], 400)
-        self.assertEqual(self.request('/api/revisions', 'POST', {})[0], 400)
-        self.assertEqual(self.request('/api/revisions', 'POST', body, auth=False)[0], 401)
+        for n in (1, 2):
+            revision = legacy_revision(self.store, self.identifier, '标题', '正文 ' + str(n), detail['source_seq'], n)
+            code, raw, _ = self.request('/api/export/' + revision['id'])
+            self.assertEqual(code, 200)
+            self.assertIn(('正文 ' + str(n)).encode(), raw)
+        self.assertEqual(self.request('/api/revisions', 'POST', {'body':'not saved'})[0], 410)
+        self.assertEqual(self.request('/api/revisions', 'POST', {}, auth=False)[0], 401)
+        self.assertEqual(len(self.store.detail(self.identifier)['revisions']), 2)
 
     def test_store_failure_is_not_exposed(self):
         with patch.object(self.store, 'listing', side_effect=sqlite3.OperationalError('secret-value')):

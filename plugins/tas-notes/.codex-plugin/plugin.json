@@ -1,18 +1,18 @@
 {
   "name": "tas-notes",
-  "version": "0.2.0+codex.2026100701",
-  "description": "Local observed execution errors and related calls. Historical review preserved. Experimental Windows hooks.",
+  "version": "0.3.0+codex.2026100703",
+  "description": "Local execution error observations, snapshot export and read-only archives. Experimental Windows hooks.",
   "author": {
     "name": "Local developer"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "TAS Notes",
+    "displayName": "Blackbox Plugin",
     "shortDescription": "Local execution errors and source evidence.",
-    "longDescription": "Capture opted-in project events locally, display tested error formats and related calls, and export Markdown without review. Broader source events and historical human versions remain stored. Windows hook coverage is limited.",
+    "longDescription": "Capture opted-in project events locally, browse error-format observations with stable snapshots, and export Markdown. Historical summaries and human versions stay read-only. Verified backup/restore and explicit service control; Windows hook coverage remains limited.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Open my local TAS Notes records for review."
+    "defaultPrompt": "Open my local Blackbox Plugin records for review."
   }
 }

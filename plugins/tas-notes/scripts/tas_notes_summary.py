@@ -1,13 +1,5 @@
-"""Readable local fallback and source-bound Agent drafts; no model/network calls."""
-import hashlib
+"""Read-only rendering of existing archives; no summary generation or writes."""
 import json
-
-SECTIONS = ('目标与要求', '尝试与调整', '理由与依据', '结果与反馈', '待确认与缺口')
-
-
-def fingerprint(events):
-    return hashlib.sha256(json.dumps([(e['seq'], e['digest']) for e in events],
-                                     separators=(',', ':')).encode()).hexdigest()
 
 
 def excerpt(value, limit=600):
@@ -61,66 +53,13 @@ def readable(record):
             parts.append(f'- **覆盖缺口**：材料因大小限制截断。{ref}')
     parts += ['## 待确认',
               '- **结果**：本版未提取结构化退出状态，Agent 的完成陈述不等于独立验证。',
-              '- **理由与依据**：使用“获取 Codex 整理指令”生成有来源的总结；缺失的理由不能编造。',
+              '- **理由与依据**：历史材料未明确提供的理由保持未知。',
               '- **用户验收**：需由你核对并说明；人工保存也不自动表示验收通过。']
     return '\n\n'.join(parts)
 
 
-def strings(value):
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            if key != '_coverage':
-                yield from strings(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from strings(item)
-
-
-def validate(payload, record):
-    from tas_notes_core import NotesError, Conflict, text
-    required = {'record_id', 'source_seq', 'fingerprint', 'expected_summary', 'sections'}
-    if not isinstance(payload, dict) or set(payload) != required:
-        raise NotesError('invalid summary fields')
-    if payload['record_id'] != record['id'] or type(payload['source_seq']) is not int:
-        raise NotesError('invalid summary record')
-    if payload['source_seq'] != record['source_seq'] or payload['fingerprint'] != fingerprint(record['events']):
-        raise Conflict('summary sources changed')
-    expected = record['summary']['id'] if record.get('summary') else None
-    if payload['expected_summary'] != expected:
-        raise Conflict('summary changed')
-    sections = payload['sections']
-    if not isinstance(sections, list) or len(sections) != len(SECTIONS):
-        raise NotesError('invalid sections')
-    sources = {e['seq']: list(strings(json.loads(e['content']))) for e in record['events']}
-    for section, heading in zip(sections, SECTIONS):
-        if not isinstance(section, dict) or set(section) != {'heading', 'items'} or section['heading'] != heading:
-            raise NotesError('invalid section')
-        items = section['items']
-        if not isinstance(items, list) or len(items) > 40:
-            raise NotesError('invalid items')
-        for item in items:
-            if not isinstance(item, dict) or set(item) != {'text', 'sources'}:
-                raise NotesError('invalid item')
-            text(item['text'], 'summary text', 3000)
-            # One paragraph per item: provenance cannot be detached by injected headings.
-            if '\n' in item['text'] or '\r' in item['text'] or '[来源 #' in item['text']:
-                raise NotesError('invalid summary paragraph')
-            refs = item['sources']
-            if not isinstance(refs, list) or not 1 <= len(refs) <= 12:
-                raise NotesError('missing sources')
-            for ref in refs:
-                if not isinstance(ref, dict) or set(ref) != {'seq', 'quote'} or type(ref['seq']) is not int:
-                    raise NotesError('invalid source')
-                quote = text(ref['quote'], 'source quote', 1000)
-                if not any(quote in s for s in sources.get(ref['seq'], [])):
-                    raise NotesError('source quote does not match')
-    return sections
-
-
 def render_summary(summary):
-    parts = ['## Agent 整理草稿', '尚待人工审阅。引用匹配仅证明材料存在，不证明解释正确；未自动判定用户验收。']
+    parts = ['## Agent 整理草稿', '历史 Agent 草稿；引用仅表明材料存在，不证明解释正确；未自动判定用户验收。']
     citations = []
     for section in json.loads(summary['content']):
         parts.append('## ' + section['heading'])

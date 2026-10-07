@@ -9,5 +9,5 @@ exit /b 0
 :missing
 if not exist "%notes_state%" mkdir "%notes_state%" 2>nul
 >"%notes_state%\last-error.json" echo {"code":"LauncherNotConfigured"}
->&2 echo TAS Notes: configure the Python runtime first.
+>&2 echo Blackbox Plugin: configure the Python runtime first.
 exit /b 0

@@ -5,6 +5,16 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 
+def parse_options(argv=None):
+    import argparse
+    from tas_notes_launcher import resolve_state_directory
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--state-dir', type=Path)
+    args = parser.parse_args(argv)
+    args.state_dir = resolve_state_directory(args.state_dir)
+    return args
+
+
 def mark(stage, directory):
     """Bounded diagnostic: no URLs, tokens, records or exception messages."""
     try:
@@ -17,11 +27,7 @@ def mark(stage, directory):
 
 if __name__ == '__main__':
     # pythonw has no standard streams. CLI messages are not secret-bearing logs.
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--state-dir', type=Path,
-                        default=Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'TAS Notes')
-    args = parser.parse_args()
+    args = parse_options()
     mark('entry-started', args.state_dir)
     with open(os.devnull, 'w') as sink:
         sys.stdout = sink
@@ -37,6 +43,6 @@ if __name__ == '__main__':
         if code:
             import ctypes
             ctypes.windll.user32.MessageBoxW(None,
-                '无法打开 TAS Notes。请让 Codex 检查本地 Python、记录目录权限及审阅服务。已有记录不会因此删除。',
-                'TAS Notes', 0x10)
+                '无法打开 Blackbox Plugin。请让 Codex 检查本地 Python、记录目录权限及审阅服务。已有记录不会因此删除。',
+                'Blackbox Plugin', 0x10)
     raise SystemExit(code)

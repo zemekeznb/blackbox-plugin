@@ -1,5 +1,6 @@
 """Bounded, content-free configuration diagnostics; never execute runtime.cmd."""
 from datetime import datetime
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -29,15 +30,23 @@ def runtime_status(directory):
         return {'state': 'invalid'}
 
 
-def last_error(directory):
+def marker_name(project=None, session=None):
+    if session and project:
+        return 'capture-session-' + hashlib.sha256(json.dumps([project, session]).encode('utf-8')).hexdigest() + '.json'
+    return ('capture-' + hashlib.sha256(project.encode('utf-8')).hexdigest() + '.json') if project else 'last-error.json'
+
+
+def last_error(directory, project=None, session=None):
     try:
-        value = json.loads(read_small(Path(directory) / 'last-error.json'))
+        name = marker_name(project, session)
+        value = json.loads(read_small(Path(directory) / name))
         if not isinstance(value, dict):
             raise ValueError('invalid marker')
         known = {'NotesError', 'Conflict', 'JSONDecodeError', 'UnicodeDecodeError',
                  'ValueError', 'RecursionError', 'OperationalError', 'IntegrityError',
                  'DatabaseError', 'OSError', 'PermissionError', 'FileNotFoundError',
-                 'LauncherNotConfigured', 'LauncherRuntimeFailed'}
+                 'LauncherNotConfigured', 'LauncherRuntimeFailed', 'InputTooLarge',
+                 'DatabaseCapacityReached', 'SessionCapacityReached'}
         code = value.get('code')
         if not isinstance(code, str) or code not in known:
             code = 'UnknownCaptureError'
@@ -47,7 +56,8 @@ def last_error(directory):
             stamp = parsed.isoformat() if parsed and parsed.tzinfo else None
         except ValueError:
             stamp = None
-        return {'state': 'recorded', 'code': code, 'time': stamp, 'scope': 'unknown_project'}
+        return {'state': 'recorded', 'code': code, 'time': stamp,
+                'scope': 'project' if project else 'unknown_project'}
     except FileNotFoundError:
         return None
     except (OSError, ValueError, RecursionError):
