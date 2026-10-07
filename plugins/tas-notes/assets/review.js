@@ -1,6 +1,7 @@
 'use strict';
 const element = id => document.getElementById(id);
 const token = new URLSearchParams(location.hash.slice(1)).get('token');
+element('anomalies-home').href = './#' + new URLSearchParams({token: token || ''}).toString();
 let selected = null;
 let dirty = false;
 let busy = false;
@@ -270,4 +271,6 @@ if (location.protocol === 'file:') {
 } else {
   list().catch(e => status(e.message));
   captureStatus();
+  const initialRecord = new URLSearchParams(location.hash.slice(1)).get('record');
+  if (initialRecord) openRecord(initialRecord).catch(e => status(e.message));
 }

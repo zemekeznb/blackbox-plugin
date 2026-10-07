@@ -1,9 +1,11 @@
 ---
 name: tas-notes-review
-description: Set up TAS Notes local recording for an explicitly selected project, inspect capture status, or open the local human review page. Use when the user asks to manage TAS Notes records; ordinary coding does not require invoking this skill.
+description: Set up TAS Notes local recording for an explicitly selected project, inspect capture status, or open local execution errors and historical records. Use when the user asks to manage TAS Notes records; ordinary coding does not require invoking this skill.
 ---
 
 # TAS Notes local review
+
+The default page now shows observed execution errors and conservatively related subsequent calls. No human approval or model summary is required to view or export an error snapshot. Only display is narrowed: opted-in projects still store broader visible events. The historical review/summary workflow below remains optional; do not invoke it merely to open execution errors. Never describe a matched error format as verified root cause or repair. Current rules only cover tested Bash terminal formats; silent failures can be missed.
 
 The plugin root is two directories above this skill. Its `scripts/tas_notes.py` is a Python 3.10+ stdlib CLI. Resolve that real path from this skill's location; do not assume a repository checkout or an executable on PATH.
 

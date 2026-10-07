@@ -358,8 +358,9 @@ class WebTests(unittest.TestCase):
         code, body, _ = self.request('/', auth=False)
         self.assertEqual(code, 200)
         self.assertIn(b'href="./review.css"', body)
-        self.assertIn(b'src="./review.js"', body)
-        for name, mime in [('review.css','text/css'),('review.js','text/javascript')]:
+        self.assertIn(b'src="./anomalies.js"', body)
+        self.assertIn(b'src="./review.js"', self.request('/history', auth=False)[1])
+        for name, mime in [('review.css','text/css'),('review.js','text/javascript'),('anomalies.js','text/javascript')]:
             code, data, headers = self.request('/'+name, auth=False)
             self.assertEqual(code, 200)
             self.assertTrue(data)

@@ -1,6 +1,18 @@
 # TAS Notes
 
-独立轻量产品：Codex + Windows + 本地工作记录 + Owner 人工审阅。
+独立轻量产品：Codex + Windows + 本地执行异常记录，无需人工确认。
+
+## 当前默认流程（2026-10-07）
+
+打开 TAS Notes → 筛选执行异常 → 查看工具返回与后续相同调用 → 直接下载 Markdown 快照。旧会话、总结、人工版本仍可从「历史会话与人工版本」进入；以下原有审阅章节描述兼容功能，不是新流程的前置条件。
+
+- 第一版只收紧展示：启用项目的普通输入、工具事件和最后回复仍可能本地保存。没有清理历史数据；后续收紧存储登记为 [NOTES-017](docs/tasks/NOTES-017.md)。
+- 当前实测规则限于 Hook 中 `Bash` 返回的四种 Python traceback（FileNotFoundError / JSONDecodeError / TimeoutExpired / PermissionError）及 PowerShell 进程启动错误。它们是返回格式观察，不是独立确认的 Bug；打印或读取相同格式也可能触发。
+- 无正文命令失败已证实可能漏记。宿主参数校验拒绝、宿主超时和其他工具格式未验证，不声称完整覆盖。详见 [覆盖报告](docs/reports/NOTES-013-capture-coverage.md)。
+- 只关联同一会话、相同工具及完整参数的后续调用；不猜测改参数、跨工具或跨会话的修复关系。真实重复失败分别保留，不自动判定解决。
+- 首次读取异常列表时以 SQLite 一致备份保护旧数据，增量创建可重建索引；每次刷新最多索引 500 个历史事件，未完成时页面提示继续刷新。备份位于同一状态目录，不是独立灾备。
+- 页面、检测、导出不调用模型。旧的「让 Codex 整理」仍是可选功能，会消耗当前 Codex 用量。
+- 依据 [ADR-N004](docs/decisions/ADR-N004-observed-execution-errors.md)，工程验证见 NOTES-013～016；真实持续使用价值仍待验收。
 
 私有源码仓库：[zemekeznb/tas-notes](https://github.com/zemekeznb/tas-notes)。
 
@@ -11,7 +23,7 @@
 | 路线 | 位置 | 状态 |
 | --- | --- | --- |
 | 完整 Team Agent System | 父目录 `tas/`、`tests/`、`clients/`、根目录历史文档 | 保留 F2 Completed / F3 Not Ready；本次不继续中央平台开发 |
-| TAS Notes | 本目录全部内容 | 真实试用已发现日志式正文问题；NOTES-006 新增可读概览与来源约束整理 |
+| TAS Notes | 本目录全部内容 | ADR-N004 执行异常默认流程；旧审阅功能保留为历史入口 |
 
 以上位置描述源项目中的划分。独立仓库只包含本目录的快照，不携带旧 TAS 代码或历史；旧项目仍保留。用户已于 2026-09-24 要求新建私有仓库，见 NOTES-003。
 

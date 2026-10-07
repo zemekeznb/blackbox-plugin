@@ -1,5 +1,18 @@
 # TAS Notes 首版设计
 
+## 当前流程：ADR-N004（2026-10-07）
+
+启用项目 → 原有 Hook 采集 → 本地事件 → 确定性异常索引 → 异常列表/来源/后续相同调用 → 直接导出静态 Markdown。下文审阅架构作为兼容历史保留。
+
+- 新实现 `tas_notes_anomalies.py` 只依赖事件和 SQLite；不改变 Hook 捕获范围，不调用模型。
+- 索引在列表请求中按 500 个事件增量重建，记录规则版本及扫描游标。事件主键作为异常 ID；真实重复操作仍是不同事件。
+- 保留基础 `PRAGMA user_version=1`，增加 `anomaly_index_state` 与 `anomalies` 扩展表，旧采集器仍能写入。迁移持有写预留锁，通过独立读连接在线备份后在事务中建表；失败不宣称迁移完成。备份不包含迁移后的新增数据，不替代灾备。
+- 仅启用真实验证的 Bash 错误格式规则。匹配代表“工具返回该错误格式”，并非独立判定程序确实出错；任意文本可以伪装错误格式。
+- 同会话、完整参数一致才关联，不尝试解析任意 shell 命令的目标。截断/脱敏参数不关联；下一次相同调用失败作为上次的末条相关操作，并独立成为新异常；中断/结束停止关联。最多 20 条。
+- API：`GET /api/anomalies?project=&tool=&start=&end=&before=` 返回 items/next_before/index_pending/rule_version；日期需带时区，end 为排他上界，每页 100 条。`GET /api/anomaly/<event_seq>?through=` 返回固定事件截止的详情；`GET /api/anomaly-export/<event_seq>?through=&rule=` 导出相同快照，规则版本不一致拒绝。沿用本地 Token、Host/Origin 和 CSP。
+- `/` 默认异常页，`/history` 保留旧会话编辑；旧 API 保留。无异常、未完成索引、连接失败分别提示，不用“没有问题”替代。
+- 默认保留策略未变。NOTES-017 另行设计长期数据缩减，本轮不删除历史。
+
 ## 用户路径
 
 为项目启用记录 → 正常使用 Codex → 自动保留可取得的过程 → 本地查看详细材料和草稿 → Owner 编辑与审阅 → 导出选中的版本 → 沿现有渠道共享。

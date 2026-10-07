@@ -85,7 +85,9 @@ def make_server(store, token=None):
             request = urlsplit(self.path)
             if not self.check(request.path.startswith('/api/')):
                 return
-            static = {'/': ('review.html', 'text/html; charset=utf-8'),
+            static = {'/': ('anomalies.html', 'text/html; charset=utf-8'),
+                      '/history': ('review.html', 'text/html; charset=utf-8'),
+                      '/anomalies.js': ('anomalies.js', 'text/javascript; charset=utf-8'),
                       '/review.js': ('review.js', 'text/javascript; charset=utf-8'),
                       '/review.css': ('review.css', 'text/css; charset=utf-8')}
             try:
@@ -102,6 +104,21 @@ def make_server(store, token=None):
                     self.send(200, store.listing(query))
                 elif request.path == '/api/status':
                     self.send(200, store.status())
+                elif request.path == '/api/anomalies':
+                    from tas_notes_anomalies import listing
+                    query = parse_qs(request.query)
+                    self.send(200, listing(store, **{key: query.get(key, [''])[0]
+                        for key in ('project', 'tool', 'start', 'end', 'before')}))
+                elif request.path.startswith('/api/anomaly/') or request.path.startswith('/api/anomaly-export/'):
+                    from tas_notes_anomalies import detail, RULE_VERSION
+                    query = parse_qs(request.query)
+                    if query.get('rule', [RULE_VERSION])[0] != RULE_VERSION:
+                        raise NotesError('rule changed; reopen record')
+                    result = detail(store, request.path.rsplit('/', 1)[1], query.get('through', [None])[0])
+                    if request.path.startswith('/api/anomaly-export/'):
+                        self.send(200, result['markdown'].encode('utf-8'), 'text/markdown; charset=utf-8')
+                    else:
+                        self.send(200, result)
                 elif request.path.startswith('/api/record/'):
                     self.send(200, store.detail(request.path.removeprefix('/api/record/')))
                 elif request.path.startswith('/api/export/'):
