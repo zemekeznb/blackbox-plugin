@@ -135,7 +135,7 @@ class Rpc:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', action='store_true', required=True)
-    parser.add_argument('--phase', choices=('smoke', 'flow', 'lifecycle', 'exit', 'shape'), default='smoke')
+    parser.add_argument('--phase', choices=('smoke', 'flow', 'lifecycle', 'exit', 'shape', 'errors'), default='smoke')
     parser.add_argument('--inspect-hook-shape', action='store_true',
                         help='Record PostToolUse field names/types in the synthetic test state, never values')
     args = parser.parse_args()
@@ -143,6 +143,18 @@ def main():
     project, state = root / '空白 test project', root / 'state'
     project.mkdir()
     (project / 'fixture.txt').write_text('Synthetic fixture: 中文 content.\n', encoding='utf-8')
+    if args.phase == 'errors':
+        # Real local exceptions, never forged Hook inputs. Independent subprocess
+        # results below distinguish a tool's execution from Hook delivery.
+        fixtures = {
+            'missing': "from pathlib import Path\nprint(Path('retry-target.txt').read_text())\n",
+            'silent': 'raise SystemExit(7)\n',
+            'validation': "import json\njson.loads('{')\n",
+            'timeout': "import subprocess, sys\nsubprocess.run([sys.executable, '-c', 'import time; time.sleep(2)'], timeout=0.05)\n",
+            'permission': "from pathlib import Path\nPath('write-target.txt').write_text('sandbox probe')\n",
+        }
+        for name, source in fixtures.items():
+            (project / (name + '.py')).write_text(source, encoding='utf-8')
     environment = dict(os.environ, TAS_NOTES_STATE_DIR=str(state))
     subprocess.run([sys.executable, str(SCRIPTS / 'tas_notes.py'), '--state-dir', str(state),
                     'configure-runtime'], check=True, capture_output=True)
@@ -182,6 +194,59 @@ def main():
         report['turns'].append(rpc.turn(thread_id, '这是安装测试。不要使用工具。只回复：TAS_NOTES_中文_OK。'))
         rows = store.listing()
         report['assertions']['record_created'] = bool(rows)
+        if args.phase == 'errors':
+            report['samples'] = []
+            for name in ('missing', 'silent', 'validation', 'timeout', 'permission', 'retry'):
+                fixture = 'missing' if name == 'retry' else name
+                if name == 'retry':
+                    (project / 'retry-target.txt').write_text('TAS_NOTES_RETRY_OK', encoding='utf-8')
+                control = None
+                if name != 'permission':
+                    observed = subprocess.run([sys.executable, fixture + '.py'], cwd=project,
+                                              capture_output=True, timeout=10)
+                    control = {'exit_code': observed.returncode, 'stderr_present': bool(observed.stderr)}
+                before = max((r['source_seq'] for r in store.listing()), default=0)
+                start_commands = len(rpc.commands)
+                prompt = ('隔离合成采集测试。只调用一次执行工具，在当前目录执行以下命令：\n'
+                          + '& "' + sys.executable + '" "' + fixture + '.py"\n'
+                          + '错误是预期测试结果，不要修复、不要重试、不要读其他文件、不要联网或调用其他 Agent。'
+                          + '请正常保留工具输出，随后简短结束。不要申请提权。')
+                report['turns'].append(rpc.turn(thread_id, prompt))
+                captured = [json.loads(e['content']) for r in store.listing()
+                            for e in store.detail(r['id'])['events']
+                            if e['seq'] > before and e['kind'] == 'PostToolUse']
+                # Only synthetic data are inspected; safe report retains format
+                # evidence rather than command paths or complete payloads.
+                signatures = ('FileNotFoundError', 'JSONDecodeError', 'TimeoutExpired',
+                              'PermissionError', 'TAS_NOTES_RETRY_OK', 'Traceback (most recent call last):')
+                report['samples'].append({'case': name, 'independent': control,
+                    'host_commands': rpc.commands[start_commands:],
+                    'hook_count': len(captured),
+                    'responses': [{'tool': c.get('tool_name'),
+                        'fields': sorted(c),
+                        'response_type': type(c.get('tool_response')).__name__,
+                        'response_length': len(str(c.get('tool_response', ''))),
+                        'signatures': [s for s in signatures if s in str(c.get('tool_response', ''))]}
+                        for c in captured],
+                    'write_probe_exists': (project / 'write-target.txt').exists() if name == 'permission' else None})
+            report['limitations'] = {'validation_is_python_parser_not_host_schema': True,
+                                    'timeout_is_subprocess_not_host_deadline': True}
+            expected = {'missing': 'FileNotFoundError', 'validation': 'JSONDecodeError',
+                        'timeout': 'TimeoutExpired', 'permission': 'PermissionError',
+                        'retry': 'TAS_NOTES_RETRY_OK'}
+            for sample in report['samples']:
+                name = sample['case']
+                report['assertions'][name + '_host_tool_observed'] = bool(sample['host_commands'])
+                if name in expected:
+                    report['assertions'][name + '_expected_output_captured'] = any(
+                        expected[name] in r['signatures'] for r in sample['responses'])
+                if name == 'silent':
+                    report['assertions']['silent_failure_gap_reproduced'] = (
+                        any(c['status'] == 'failed' for c in sample['host_commands'])
+                        and bool(sample['responses'])
+                        and all(r['response_length'] == 0 for r in sample['responses']))
+                if name == 'permission':
+                    report['assertions']['sandbox_write_did_not_happen'] = not sample['write_probe_exists']
         if args.phase == 'shape':
             report['turns'].append(rpc.turn(thread_id,
                 '合成字段测试。只执行一次 cmd.exe /d /c exit 7；这是预期失败，不要重试，不要读取文件或访问网络。然后简短结束。'))
