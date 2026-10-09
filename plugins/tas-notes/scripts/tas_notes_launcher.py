@@ -75,6 +75,11 @@ def resolve_state_directory(directory=None, *, create=False):
     path = Path(directory if directory is not None else default_state()).expanduser().resolve()
     if create:
         path.mkdir(parents=True, exist_ok=True)
+    # MSIX may redirect files without redirecting the directory handle. An
+    # existing database is authoritative; keep its runtime files beside it.
+    database = path / 'notes.sqlite3'
+    if database.is_file() and not database.is_symlink():
+        return Path(physical_file_path(database)).parent
     return Path(physical_directory_path(path)) if path.exists() else path
 
 

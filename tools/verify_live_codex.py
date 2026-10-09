@@ -24,9 +24,12 @@ from tas_notes_core import Store
 
 
 class Rpc:
-    def __init__(self, environment):
+    def __init__(self, environment, enable_hooks=True, capture_synthetic_output=False):
+        arguments = [shutil.which('codex') or 'codex', 'app-server', '--stdio']
+        if enable_hooks:
+            arguments += ['-c', 'features.hooks=true']
         self.process = subprocess.Popen(
-            [shutil.which('codex') or 'codex', 'app-server', '--stdio', '-c', 'features.hooks=true'],
+            arguments,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding='utf-8', env=environment,
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -35,6 +38,9 @@ class Rpc:
         self.completed = {}
         self.hooks = []
         self.commands = []
+        self.capture_synthetic_output = capture_synthetic_output
+        self.command_diagnostics = []
+        self.command_metadata = []
         self.notifications = set()
         self.counter = 0
         threading.Thread(target=self.read, daemon=True).start()
@@ -66,6 +72,11 @@ class Rpc:
             item = params['item']
             self.commands.append({'exit_code': item.get('exitCode'),
                                   'status': item.get('status')})
+            if self.capture_synthetic_output:
+                self.command_diagnostics.append(item.get('aggregatedOutput', ''))
+                # Only opted-in synthetic harnesses inspect this in memory.
+                # Keep command paths and output out of the public summary.
+                self.command_metadata.append({key: item.get(key) for key in ('command', 'cwd')})
         if method == 'hook/completed':
             run = params['run']
             if 'tas-notes' in run.get('sourcePath', '').replace('\\', '/').lower():

@@ -18,6 +18,22 @@ from tas_notes_launcher import (healthy, ensure_reviewer, stop_reviewer, request
 from open_notes import parse_options
 
 class LauncherTests(unittest.TestCase):
+    def test_existing_database_resolves_file_overlay_before_directory(self):
+        with tempfile.TemporaryDirectory(prefix='notes-overlay-test-') as root:
+            logical, physical = Path(root) / 'logical', Path(root) / 'physical'
+            logical.mkdir(); physical.mkdir()
+            (logical / 'notes.sqlite3').write_bytes(b'placeholder')
+            with patch('tas_notes_launcher.physical_file_path', return_value=str(physical / 'notes.sqlite3')) as file_path, \
+                    patch('tas_notes_launcher.physical_directory_path', return_value=str(logical)) as directory_path:
+                self.assertEqual(resolve_state_directory(logical), physical)
+                file_path.assert_called_once_with(logical / 'notes.sqlite3')
+                directory_path.assert_not_called()
+            # A new explicit state still uses its own directory, never another DB.
+            (logical / 'notes.sqlite3').unlink()
+            with patch('tas_notes_launcher.physical_file_path') as file_path:
+                self.assertEqual(resolve_state_directory(logical), logical)
+                file_path.assert_not_called()
+
     def test_reviewer_survives_launch_command_exit(self):
         with tempfile.TemporaryDirectory(prefix='notes-launch-test-') as root:
             launch = subprocess.run([sys.executable, str(ENTRY), '--state-dir', root,
