@@ -10,6 +10,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
 from tas_notes_core import Store, NotesError, MAX_FIELD
@@ -231,11 +232,118 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(a.listing(self.store, start='2100-01-01T00:00:00+00:00')['items'], [])
         for args in ({'start':'bad'}, {'start':'2026-01-01'}, {'before':'-1'}, {'before':'9'*30},
                      {'through': first+1}, {'through': True}, {'through': -1}, {'through': 0.0},
-                     {'start':'2026-01-02T00:00:00Z', 'end':'2026-01-01T00:00:00Z'}):
+                     {'start':'2026-01-02T00:00:00Z', 'end':'2026-01-01T00:00:00Z'},
+                     {'project_path': None}, {'investigation': True},
+                     {'project_path': 'x'*32768}, {'investigation': 'x'*201}):
             with self.assertRaises(NotesError):
                 a.listing(self.store, **args)
         with self.assertRaises(NotesError):
             a.detail(self.store, first, first+100)
+
+    def test_exact_project_and_session_filters_do_not_merge_matching_prefixes_or_ids(self):
+        first, first_session, _ = self.emit(session='same-session')
+        second, second_session, _ = self.emit(session='another-session')
+        sibling = self.root / 'project-extra'
+        sibling.mkdir()
+        self.store.set_project(str(sibling), True)
+        third, third_session, _ = self.emit(session='same-session', cwd=str(sibling))
+        self.assertNotEqual(first_session, third_session)
+        project = str(self.project.resolve())
+        page = a.listing(self.store, project_path=project)
+        self.assertEqual([item['id'] for item in page['items']], [str(second), str(first)])
+        self.assertEqual({item['session'] for item in page['items']}, {'same-session', 'another-session'})
+        self.assertEqual({item['investigation'] for item in page['items']}, {first_session, second_session})
+        self.assertEqual(len(a.listing(self.store, project='project')['items']), 3)
+        self.assertEqual([item['id'] for item in a.listing(self.store, investigation=first_session)['items']],
+                         [str(first)])
+        self.assertEqual(a.listing(self.store, project_path=project, investigation=third_session)['items'], [])
+        frozen = a.listing(self.store, project_path=project, investigation=first_session)
+        self.emit(session='same-session')
+        self.assertEqual(a.listing(self.store, project_path=project, investigation=first_session,
+                                  through=frozen['snapshot_seq'])['items'], frozen['items'])
+        self.assertEqual(a.detail(self.store, third)['session'], 'same-session')
+        self.assertEqual(a.detail(self.store, third)['investigation'], third_session)
+
+    def test_contexts_are_readonly_metadata_and_keep_disabled_project_sessions(self):
+        _, first_session, _ = self.emit(session='first-session')
+        _, second_session, _ = self.emit(session='second-session', hook_event_name='UserPromptSubmit',
+                                         prompt='private prompt must not become a session label')
+        other = self.root / 'other-project'
+        other.mkdir()
+        self.store.set_project(str(other), True)
+        self.emit(session='first-session', cwd=str(other))
+        empty_project = self.root / 'empty-project'
+        empty_project.mkdir()
+        self.store.set_project(str(empty_project), False)
+        self.store.set_project(str(self.project), False)
+        with self.store.connect() as db:
+            db.execute('UPDATE events SET captured=? WHERE investigation=?',
+                       ('2026-01-02T00:00:00+00:00', first_session))
+            # Broken/legacy event bodies cannot prevent context metadata reading.
+            db.execute('UPDATE events SET content=? WHERE investigation=?', ('not JSON', second_session))
+        before = self.store.database.read_bytes()
+        @contextmanager
+        def scalar_only_connection():
+            db = sqlite3.connect(self.store.database.as_uri() + '?mode=ro', uri=True, isolation_level=None)
+            db.row_factory = sqlite3.Row
+            db.set_authorizer(lambda action, table, column, *_:
+                              sqlite3.SQLITE_DENY if action == sqlite3.SQLITE_READ
+                              and table == 'events' and column == 'content' else sqlite3.SQLITE_OK)
+            try:
+                yield db
+            finally:
+                db.close()
+        with patch.object(self.store, 'connect', scalar_only_connection):
+            result = a.contexts(self.store, str(self.project.resolve()))
+            self.assertEqual(a.contexts(self.store)['sessions'], [])
+            self.assertEqual(a.contexts(self.store, str(self.project) + '-missing')['sessions'], [])
+        self.assertEqual(self.store.database.read_bytes(), before)
+        self.assertEqual([(p['path'], p['enabled']) for p in result['projects']], [
+            (str(other.resolve()), True), (str(self.project.resolve()), False)])
+        self.assertTrue(all(p['last_captured'] for p in result['projects']))
+        self.assertEqual([session['id'] for session in result['sessions']], [second_session, first_session])
+        self.assertTrue(all(set(session) == {'id', 'session', 'first_captured', 'last_captured'}
+                            for session in result['sessions']))
+        self.assertEqual(result['sessions'][1]['first_captured'], '2026-01-02T00:00:00+00:00')
+        self.assertEqual(result['sessions'][1]['last_captured'], '2026-01-02T00:00:00+00:00')
+        self.assertNotIn('private prompt', json.dumps(result))
+
+    def test_contexts_do_not_silently_truncate_sessions(self):
+        with self.store.connect() as db:
+            db.execute('BEGIN')
+            db.executemany('INSERT INTO investigations VALUES (?,?,?,?)',
+                           ((f'id-{n:04}', str(self.project.resolve()), f'session-{n}',
+                             '2026-01-01T00:00:00Z') for n in range(504)))
+            db.executemany('''INSERT INTO events(investigation,event_key,kind,content,digest,captured)
+                              VALUES(?,?,?,?,?,?)''',
+                           ((f'id-{n:04}', f'event-{n}', 'SessionStart', '{}', 'test-digest',
+                             '2026-01-01T00:00:00Z') for n in range(503)))
+            db.commit()
+        result = a.contexts(self.store, str(self.project.resolve()))
+        self.assertEqual(len(result['sessions']), 503)
+        self.assertTrue(all(session['first_captured'] and session['last_captured']
+                            for session in result['sessions']))
+        self.assertNotIn('id-0503', [session['id'] for session in result['sessions']])
+
+    def test_export_session_context_and_encoding_notice_only_follow_readable_output(self):
+        first, investigation, _ = self.emit(command='python example.py # \ufffd', session='session-\ufffd')
+        result = a.detail(self.store, first)
+        self.assertEqual(result['session'], 'session-\ufffd')
+        self.assertEqual(result['investigation'], investigation)
+        self.assertIn(a.fenced('session-\ufffd'), result['markdown'])
+        self.assertIn('- 会话记录 ID：' + investigation, result['markdown'])
+        self.assertIn('## 技术详情 · 已保存来源', result['markdown'])
+        self.assertNotIn('未捕获到符合边界规则', result['markdown'])
+        self.assertNotIn('部分文字可能显示不完整', result['markdown'])
+        noise, _, _ = self.emit('\ufffd ordinary log\n' + TRACE, session='noise')
+        self.assertNotIn('部分文字可能显示不完整', a.detail(self.store, noise)['markdown'])
+        error, _, _ = self.emit(TRACE.replace('absent', '\ufffd'), session='error')
+        self.assertIn('> 部分文字可能显示不完整。', a.detail(self.store, error)['markdown'])
+        self.emit('repeated output \ufffd', command='python example.py # \ufffd', session='session-\ufffd')
+        linked = a.detail(self.store, first)
+        self.assertEqual(len(linked['events']), 2)
+        self.assertIn('> 部分文字可能显示不完整。', linked['markdown'])
+        self.assertNotIn('原始文字可能已丢失', linked['markdown'])
 
     def add_copies(self, count, content=None):
         # Use direct fixture insertion to exercise batch limits without renderer overhead.
@@ -316,13 +424,24 @@ class AnomalyTests(unittest.TestCase):
             finally:
                 conn.close()
         try:
-            for path in ('/api/anomalies','/api/anomaly/'+str(first),'/api/anomaly-export/'+str(first)):
+            for path in ('/api/anomalies','/api/anomaly-contexts',
+                         '/api/anomaly/'+str(first),'/api/anomaly-export/'+str(first)):
                 self.assertEqual(request(path,False)[0],401)
                 self.assertEqual(request(path)[0],200)
-            self.assertIn('无需人工确认'.encode(),request('/')[1])
+            home = request('/')[1].decode('utf-8')
+            self.assertIn('id="list-view"', home)
+            self.assertIn('id="detail-view"', home)
+            self.assertIn('原始事件保存范围尚未同步收紧', home)
+            self.assertNotIn('href="./history"', home)
             self.assertIn('历史会话'.encode(),request('/history')[1])
             page=json.loads(request('/api/anomalies')[1])
             snapshot=json.loads(request('/api/anomaly/'+str(first))[1])
+            context=json.loads(request('/api/anomaly-contexts?' + urlencode({
+                'project_path':str(self.project.resolve())}))[1])
+            self.assertEqual(context['sessions'][0]['id'], snapshot['investigation'])
+            scoped=json.loads(request('/api/anomalies?' + urlencode({
+                'project_path':str(self.project.resolve()), 'investigation':snapshot['investigation']}))[1])
+            self.assertEqual(scoped['items'], page['items'])
             self.emit(session='new session')
             frozen=json.loads(request('/api/anomalies?through='+str(page['snapshot_seq']))[1])
             self.assertEqual([item['id'] for item in frozen['items']], [str(first)])

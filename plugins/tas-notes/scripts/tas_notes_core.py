@@ -78,6 +78,13 @@ def clean(value, depth=0):
     raise NotesError('unsupported event value')
 
 
+def session_identity(payload):
+    session = text(payload.get('session_id') or payload.get('thread_id'), 'session_id')
+    if payload.get('session_id') and payload.get('thread_id') and payload['session_id'] != payload['thread_id']:
+        raise NotesError('ambiguous session identity')
+    return session
+
+
 def normalize(payload, adapter_version=2):
     if not isinstance(payload, dict):
         raise NotesError('hook input must be an object')
@@ -86,9 +93,7 @@ def normalize(payload, adapter_version=2):
     kind = payload.get('hook_event_name')
     if not isinstance(kind, str) or kind not in EVENTS:
         raise NotesError('unsupported hook event')
-    session = text(payload.get('session_id') or payload.get('thread_id'), 'session_id')
-    if payload.get('session_id') and payload.get('thread_id') and payload['session_id'] != payload['thread_id']:
-        raise NotesError('ambiguous session identity')
+    session = session_identity(payload)
     project = project_path(payload.get('cwd'))
     content, truncated = {}, []
     for field in FIELDS if adapter_version == 2 else FIELDS[:10]:
@@ -240,10 +245,41 @@ class Store:
             # Normalization/connection errors happen before the writer section.
             # Errors inside it already published their marker while serialized.
             if not getattr(error, '_capture_diagnostic_recorded', False):
-                code = error.code if isinstance(error, CaptureLimit) else type(error).__name__
-                session = payload.get('session_id') or payload.get('thread_id')
-                diagnostic(self.directory, code, project, session if isinstance(session, str) else None)
+                try:
+                    session = session_identity(payload)
+                except NotesError:
+                    # A partially known project does not establish which session
+                    # lost a boundary. Never pick one side of ambiguous identity.
+                    self.capture_failure(error)
+                else:
+                    self.capture_failure(error, project, session)
             raise
+
+    def record_stream(self, stream):
+        """Bound input before decoding; never infer identity from a JSON prefix."""
+        try:
+            raw = stream.read(MAX_INPUT + 1)
+            if len(raw) > MAX_INPUT:
+                raise CaptureLimit('InputTooLarge')
+            return self.record(json.loads(raw.decode('utf-8-sig')))
+        except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
+            if not getattr(error, '_capture_diagnostic_recorded', False):
+                self.capture_failure(error)
+            raise
+
+    def capture_failure(self, error, project=None, session=None):
+        """Publish rejection metadata in capture order when storage permits."""
+        code = error.code if isinstance(error, CaptureLimit) else type(error).__name__
+        try:
+            with self.connect() as db:
+                db.execute('BEGIN IMMEDIATE')
+                diagnostic(self.directory, code, project, session)
+                db.rollback()
+        except (OSError, sqlite3.Error):
+            # Keep a content-free hint even if the database cannot be locked.
+            # As with an unwritable marker directory, ordering is then best effort.
+            diagnostic(self.directory, code, project, session)
+        error._capture_diagnostic_recorded = True
 
     def _record_enabled(self, payload):
         project, session, kind, key, body = normalize(payload)
@@ -257,10 +293,26 @@ class Store:
                     return {'status': 'ignored', 'reason': 'project_not_enabled'}
                 # Read gap state only after earlier writers have completed. A
                 # rejected boundary publishes its marker before releasing this lock.
+                content = json.loads(body)
+                content['_coverage']['capture_boundary_version'] = 1
+                unknown = preserve_unscoped_error(self.directory)
+                if unknown:
+                    content['_coverage']['capture_epoch'] = unknown['epoch']
+                    previous_source = db.execute('''SELECT e.content FROM events e
+                        JOIN investigations i ON e.investigation=i.id
+                        WHERE i.project=? AND i.session=? ORDER BY e.seq DESC LIMIT 1''',
+                        (project, session)).fetchone()
+                    previous_epoch = (json.loads(previous_source['content']).get('_coverage', {}).get('capture_epoch')
+                                      if previous_source else None)
+                    if unknown['state'] == 'unreadable' or previous_epoch != unknown['epoch']:
+                        content['_coverage']['capture_gap_before'] = True
+                        content['_coverage']['capture_gap_scope'] = 'unknown_project'
+                        content['_coverage']['capture_gap_reason'] = ('diagnostic_unreadable' if unknown['state'] == 'unreadable'
+                            else 'restored_store' if unknown['code'] == 'RestoreContinuityUnknown' else 'capture_rejected')
                 if last_error(self.directory, project, session):
-                    content = json.loads(body)
                     content['_coverage']['capture_gap_before'] = True
-                    body = canonical(content)
+                    content['_coverage']['capture_gap_scope'] = 'session'
+                body = canonical(content)
                 digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
                 row = db.execute('SELECT id FROM investigations WHERE project=? AND session=?', (project, session)).fetchone()
                 identifier = row['id'] if row else str(uuid4())
@@ -277,7 +329,8 @@ class Store:
                         if not legacy:
                             current = json.loads(body)
                             for value in (old, current):
-                                value.get('_coverage', {}).pop('capture_gap_before', None)
+                                for field in ('capture_gap_before', 'capture_gap_scope', 'capture_gap_reason', 'capture_epoch', 'capture_boundary_version'):
+                                    value.get('_coverage', {}).pop(field, None)
                             unchanged = old == current
                         if not unchanged:
                             raise Conflict('host event ID reused with different content')
@@ -322,7 +375,7 @@ class Store:
         return [r for r in items if query.casefold() in canonical(r).casefold()]
 
     def status(self):
-        from tas_notes_diagnostics import runtime_status, last_error
+        from tas_notes_diagnostics import runtime_status, last_error, unscoped_error
         with self.connect() as db:
             db.execute('BEGIN')
             projects = [dict(r) for r in db.execute('''SELECT p.path, p.enabled,
@@ -353,6 +406,7 @@ class Store:
                             'error_reserve_bytes': ERROR_RESERVE_BYTES},
                 'record_count': sum(p['record_count'] for p in projects), 'records': records,
                 'last_capture_error': last_error(self.directory),
+                'last_unscoped_capture_error': unscoped_error(self.directory),
                 'host_integration': 'not_checked', 'continuous_capture': 'unknown'}
 
     def detail(self, identifier):
@@ -412,15 +466,12 @@ def render_draft(record):
     return readable(record)
 
 
-def diagnostic(directory, code, project=None, session=None):
-    """Atomic, bounded, content-free last failure marker; recording stays fail-open."""
-    from tas_notes_diagnostics import marker_name
-    name = marker_name(project, session)
+def write_diagnostic_marker(directory, name, value):
     target = Path(directory) / name
     temporary = target.with_name(f'.diagnostic-{uuid4().hex}.tmp')
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        temporary.write_text(canonical({'time': now(), 'code': code}), encoding='utf-8')
+        temporary.write_text(canonical(value), encoding='utf-8')
         os.replace(temporary, target)
     except OSError:
         pass
@@ -429,10 +480,35 @@ def diagnostic(directory, code, project=None, session=None):
             temporary.unlink(missing_ok=True)
         except OSError:
             pass
-    if session and project:
-        diagnostic(directory, code, project)
-    elif project:
-        diagnostic(directory, code)
+
+
+def preserve_unscoped_error(directory):
+    """Keep legacy unknown metadata before a new scoped summary replaces it."""
+    from tas_notes_diagnostics import unscoped_error
+    marker = unscoped_error(directory)
+    if marker and (marker['legacy'] or marker.get('inconsistent')):
+        write_diagnostic_marker(directory, 'capture-unknown.json', {
+            'time': marker['time'], 'code': 'InvalidDiagnosticMarker' if marker.get('inconsistent') else marker['code'], 'scope': 'unknown_project',
+            'legacy_epoch': marker['epoch']})
+        return unscoped_error(directory)
+    return marker
+
+
+def diagnostic(directory, code, project=None, session=None):
+    """Atomic, bounded, content-free markers; an unknown gap is not an attribution."""
+    from tas_notes_diagnostics import marker_name
+    preserve_unscoped_error(directory)
+    value = {'time': now(), 'code': code,
+             'scope': 'session' if project and session else 'project' if project else 'unknown_project'}
+    if project:
+        if session:
+            write_diagnostic_marker(directory, marker_name(project, session), value)
+        write_diagnostic_marker(directory, marker_name(project), value)
+    else:
+        # A fresh token distinguishes multiple rejections with equal clock stamps.
+        value['epoch'] = uuid4().hex
+        write_diagnostic_marker(directory, 'capture-unknown.json', value)
+    write_diagnostic_marker(directory, 'last-error.json', value)
 
 
 def main(argv=None):
@@ -460,7 +536,7 @@ def main(argv=None):
     export.add_argument('revision_id')
     export.add_argument('destination', type=Path)
     args = parser.parse_args(argv)
-    directory = None
+    directory, store = None, None
     try:
         if args.command == 'restore':
             from tas_notes_backup import restore
@@ -490,10 +566,7 @@ def main(argv=None):
         elif args.command in ('enable', 'disable'):
             result = store.set_project(args.project, args.command == 'enable')
         elif args.command == 'hook':
-            raw = sys.stdin.buffer.read(MAX_INPUT + 1)
-            if len(raw) > MAX_INPUT:
-                raise CaptureLimit('InputTooLarge')
-            result = store.record(json.loads(raw.decode('utf-8-sig')))
+            result = store.record_stream(sys.stdin.buffer)
             # Never inject captured text or additional instructions into the Agent.
             return 0
         elif args.command == 'backup':
@@ -533,6 +606,9 @@ def main(argv=None):
             print('Blackbox Plugin: reviewer_build_changed; run stop, then open. Preserve any old unsaved edits first.', file=sys.stderr)
         else:
             print(f'Blackbox Plugin: {code}; operation not completed.', file=sys.stderr)
-        if args.command == 'hook' and directory is not None:
-            diagnostic(directory, code)
+        if args.command == 'hook' and directory is not None and not getattr(error, '_capture_diagnostic_recorded', False):
+            if store is not None:
+                store.capture_failure(error)
+            else:
+                diagnostic(directory, code)
         return 0 if args.command == 'hook' else 1

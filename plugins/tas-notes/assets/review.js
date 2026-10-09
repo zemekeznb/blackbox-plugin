@@ -111,8 +111,9 @@ async function openRecord(id) {
     block(detail, 'p', '历史解释并非原始观察；引用匹配不证明解释正确。保存后新增的事件不在此总结内。');
     block(detail, 'pre', historicalSummary(summary.content)); summaries.append(detail);
   }
-  const captureGap=record.events.some(event=>JSON.parse(event.content)._coverage?.capture_gap_before);
-  status((captureGap ? '该会话存在已知采集缺口，历史内容不能证明完整过程。' : '')+'历史来源、模型总结和人工版本分别保留，只读查看。页面不会执行来源中的命令或 HTML。');
+  const gaps=record.events.map(event=>JSON.parse(event.content)._coverage).filter(coverage=>coverage?.capture_gap_before);
+  const gapNotice=gaps.some(coverage=>coverage.capture_gap_scope!=='unknown_project') ? '该会话存在已知采集缺口，历史内容不能证明完整过程。' : gaps.length ? '存在归属未知拒收、诊断不可读或恢复后的连续性边界，已采用保守关联规则；不能断言该会话丢失了事件。' : '';
+  status(gapNotice+'历史来源、模型总结和人工版本分别保留，只读查看。页面不会执行来源中的命令或 HTML。');
 }
 async function exportSaved() {
   if (!selected || !selectedRevision) return;

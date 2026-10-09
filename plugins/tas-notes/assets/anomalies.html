@@ -5,39 +5,65 @@
   <title>Blackbox Plugin · 执行异常</title>
   <link rel="stylesheet" href="./review.css"><script src="./anomalies.js" defer></script>
 </head>
-<body>
-  <header><div class="brand">Blackbox Plugin <span>执行异常 · 本地记录</span></div><p>保留工具返回的错误和同参数后续调用，无需人工确认。</p><a id="history" href="./history">历史会话与人工版本（只读）</a></header>
-  <section id="file-preview" hidden class="notice"><strong>当前是页面文件预览。</strong><p>请双击桌面或开始菜单的 Blackbox Plugin 打开本地记录服务。</p></section>
-  <section class="capture" aria-label="记录范围">
-    <h2>记录范围</h2>
-    <p>当前只收紧展示：已启用项目的普通输入、工具事件和最后回复仍可能保存在本机。未删除历史数据。</p>
-    <p class="muted">当前筛选 Bash 返回中的完整 Python traceback 和指定 PowerShell 诊断格式。已保存的退出状态等字段尚未经过宿主契约验证，不单独用于判错；其他工具和格式可能漏记。空返回不表示成功，未发现异常不代表没有问题。</p>
-    <p id="capture-status" role="status">正在读取本地采集状态…</p>
-    <details><summary>采集状态、容量与运行版本</summary><p id="runtime-status" class="muted"></p><p id="application-status" class="muted"></p><p id="storage-status"></p><div id="capture-projects"></div><p id="capture-error" class="muted"></p><p class="muted">历史落盘不能证明当前持续采集。停止阅读服务不会停用项目采集；再次双击入口可重启。</p><button id="shutdown">停止本地阅读服务</button></details>
-  </section>
-  <main>
-    <aside aria-label="异常列表">
-      <h1>执行异常</h1>
-      <label for="project">项目路径包含</label><input id="project" type="search" maxlength="200">
-      <label for="tool">工具名称包含</label><input id="tool" type="search" maxlength="200">
-      <label for="start">起始日期（本地时间）</label><input id="start" type="date">
-      <label for="end">结束日期（含当天）</label><input id="end" type="date">
-      <div class="actions"><button id="refresh" class="primary">筛选 / 刷新</button><button id="clear">清除筛选</button></div>
-      <p id="list-status" role="status"></p><div id="records"></div><button id="more" hidden>加载更多</button>
+<body class="anomaly-app">
+  <header class="app-header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">B</span> Blackbox <span class="brand-caption">执行记录</span></div>
+    <span class="local-label">本地保存</span>
+  </header>
+  <details id="help" class="app-help">
+    <summary>采集与隐私</summary>
+    <div class="help-content">
+      <h2>哪些内容会被保存？</h2>
+      <p>仅采集明确启用的项目。展示范围已收紧，原始事件保存范围尚未同步收紧：可见输入、工具调用与返回、最终回复等事件仍保存在本机，页面只展示其中匹配错误格式的记录。</p>
+      <p>按项目和会话查看已保存的记录。会话名称通过本机 Codex 的只读接口获取，不读取对话正文；名称暂不可用时显示“未命名会话”和日期。上次选择的会话保存在本机。未归属到已启用项目的会话不采集。页面时间是本机保存记录的时间，不一定是错误实际发生的时刻。</p>
+      <p>当前识别 Bash 返回中的完整 Python traceback 和指定 PowerShell 错误格式。无输出的非零退出、被其他输出打断的 traceback 和其他工具错误可能漏记；打印已有错误日志也可能被列出。</p>
+      <p>记录经过有限脱敏，仍可能含敏感信息，分享下载文件前请检查。采集和阅读默认不上传、不调用额外模型；Codex 本身的模型请求不因此变成本地运行。</p>
+      <h2>项目与采集状态</h2>
+      <p id="capture-status" role="status">正在读取…</p><div id="capture-projects"></div>
+      <details><summary>运行信息与诊断</summary><p id="runtime-status" class="muted"></p><p id="application-status" class="muted"></p><p id="storage-status"></p><p id="capture-error" class="muted"></p></details>
+      <p class="muted">最后落盘时间只说明已保存的记录，不能保证持续采集。停止阅读服务不会停用项目采集。</p>
+      <button id="shutdown">停止阅读服务</button>
+    </div>
+  </details>
+  <section id="file-preview" hidden class="notice"><strong>当前是页面文件预览。</strong><p>请双击桌面或开始菜单的 Blackbox Plugin 打开本地记录。</p></section>
+  <main id="workspace" data-stage="reading">
+    <aside id="navigation" class="session-navigation" aria-label="项目与会话">
+      <div class="navigation-heading"><h2>项目与会话</h2><button id="nav-refresh" title="刷新项目和会话" aria-label="刷新项目和会话">↻</button></div>
+      <p class="navigation-intro">已保存的执行记录</p>
+      <p id="context-status" class="muted" role="status">正在读取项目…</p>
+      <nav id="project-tree" aria-label="已保存会话"></nav>
+      <button id="nav-return" class="mobile-navigation" hidden>返回当前会话 →</button>
     </aside>
-    <section aria-label="异常详情">
-      <p id="status" role="status" aria-live="polite">选择一条异常，查看事实及相关来源。</p>
-      <div id="empty"><h2>查看执行中出现过的错误</h2><p>后续重试不会抹掉先前失败。这里不判断根因、责任或整体任务是否修复。</p></div>
+    <div id="reader" class="reader">
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="list-view" aria-labelledby="list-heading">
+      <button id="browse-sessions" class="mobile-navigation back-button">← 项目与会话</button>
+      <div class="page-heading"><div><p id="project-heading" class="eyebrow">执行回看</p><h1 id="list-heading" tabindex="-1">选择会话</h1><p id="session-description" class="intro">从项目中打开一个会话，查看其中的异常记录。</p></div><button id="refresh">刷新记录</button></div>
+      <form id="filters" class="filters">
+        <input id="project" type="hidden"><input id="session" type="hidden">
+        <div><label for="time">记录时间</label><select id="time"><option value="all">全部时间</option><option value="today">今天</option><option value="week">近七天</option><option value="custom">自定义范围</option></select></div>
+        <div><label for="tool">工具</label><input id="tool" type="search" maxlength="200" placeholder="全部工具"></div>
+        <div id="date-range" class="date-range" hidden><div><label for="start">从</label><input id="start" type="date"></div><div><label for="end">至（含当天）</label><input id="end" type="date"></div></div>
+        <div class="filter-actions"><button id="apply" type="submit" class="primary">筛选</button><button id="clear" type="button">重置</button></div>
+      </form>
+      <div class="list-summary"><p id="list-status" role="status">正在读取记录…</p><span>最新在前</span></div>
+      <div id="records" class="cards"></div>
+      <div id="list-empty" class="empty-state" hidden><span class="empty-symbol" aria-hidden="true">—</span><h2>暂未找到匹配记录</h2><p>可以调整筛选条件。这不代表执行中没有问题。</p></div>
+      <div class="list-bottom"><button id="more" hidden>加载更多</button><p id="snapshot-info" class="muted"></p></div>
+    </section>
+    <section id="detail-view" aria-labelledby="record-heading" hidden>
+      <div class="detail-toolbar"><button id="back" class="back-button">← 返回记录</button><button id="export" class="primary" disabled>下载 Markdown</button></div>
+      <p id="detail-status" role="status" aria-live="polite"></p><button id="retry" hidden>重新加载详情</button>
       <div id="detail" hidden>
-        <h2 id="record-heading"></h2><p id="meta" class="muted"></p>
-        <p class="notice">按错误格式识别的观察记录，不是独立验证的 Bug。同参数后续调用只在已捕获的回合边界内匹配相同会话、工具及完整参数，不推断处理意图或修复结果。</p>
-        <div class="actions"><button id="export" class="primary">下载当前记录 Markdown</button><a id="session" href="./history">查看历史会话</a></div>
-        <article id="reading" aria-label="异常事实"></article>
-        <details><summary>已保存的参数、返回与覆盖标记</summary><div id="events"></div></details>
-        <p class="muted">下载与当前打开的快照一致；刷新列表并重新打开记录后才包含新增材料。没有上传或 Git 推送。分享前请检查敏感信息。</p>
+        <p class="eyebrow">异常详情</p><h1 id="record-heading" tabindex="-1"></h1><p id="meta" class="detail-meta"></p>
+        <p class="detail-context">以下是工具返回的错误记录及相同输入的再次调用，不代表已确认根因或修复。</p>
+        <article id="reading" aria-label="操作与返回"></article>
+        <details id="source-details" class="source-details"><summary>技术详情</summary><p class="muted">用于核对记录的已保存数据与摘要。</p><p id="detail-snapshot" class="muted"></p><div id="events"></div></details>
+        <p class="download-note">下载保留当前打开的内容。分享前请检查敏感信息。</p>
       </div>
     </section>
+    </div>
   </main>
-  <footer>本地规则识别 · 无后台模型调用 · 无人工审核门槛 · 不自动发布</footer>
+  <footer>Blackbox Plugin <span>留下过程，方便回看。</span></footer>
 </body>
 </html>

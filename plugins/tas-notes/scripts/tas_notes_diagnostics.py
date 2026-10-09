@@ -36,17 +36,17 @@ def marker_name(project=None, session=None):
     return ('capture-' + hashlib.sha256(project.encode('utf-8')).hexdigest() + '.json') if project else 'last-error.json'
 
 
-def last_error(directory, project=None, session=None):
+def read_error(path, scope):
     try:
-        name = marker_name(project, session)
-        value = json.loads(read_small(Path(directory) / name))
+        value = json.loads(read_small(path))
         if not isinstance(value, dict):
             raise ValueError('invalid marker')
         known = {'NotesError', 'Conflict', 'JSONDecodeError', 'UnicodeDecodeError',
                  'ValueError', 'RecursionError', 'OperationalError', 'IntegrityError',
                  'DatabaseError', 'OSError', 'PermissionError', 'FileNotFoundError',
                  'LauncherNotConfigured', 'LauncherRuntimeFailed', 'InputTooLarge',
-                 'DatabaseCapacityReached', 'SessionCapacityReached'}
+                 'DatabaseCapacityReached', 'SessionCapacityReached',
+                 'UnknownCaptureError', 'InvalidDiagnosticMarker', 'RestoreContinuityUnknown'}
         code = value.get('code')
         if not isinstance(code, str) or code not in known:
             code = 'UnknownCaptureError'
@@ -56,10 +56,53 @@ def last_error(directory, project=None, session=None):
             stamp = parsed.isoformat() if parsed and parsed.tzinfo else None
         except ValueError:
             stamp = None
+        stored_scope = value.get('scope', scope)
         return {'state': 'recorded', 'code': code, 'time': stamp,
-                'scope': 'project' if project else 'unknown_project'}
+                'scope': stored_scope if stored_scope in ('project', 'session', 'unknown_project') else scope}
     except FileNotFoundError:
         return None
     except (OSError, ValueError, RecursionError):
         return {'state': 'unreadable', 'code': 'InvalidDiagnosticMarker', 'time': None,
                 'scope': 'unknown_project'}
+
+
+def last_error(directory, project=None, session=None):
+    return read_error(Path(directory) / marker_name(project, session),
+                      'session' if project and session else 'project' if project else 'unknown_project')
+
+
+def unscoped_error(directory):
+    """Read a bounded rejection epoch, with conservative pre-NOTES-026 fallback.
+
+    Old last-error markers have no scope: they cannot establish which project
+    lost an event. New scoped summary markers must not become global barriers.
+    The epoch is a digest of metadata only, never a rejected Hook body.
+    """
+    candidates = []
+    for name in ('capture-unknown.json', 'last-error.json'):
+        path = Path(directory) / name
+        marker = read_error(path, 'unknown_project')
+        if marker is None:
+            continue
+        if marker['scope'] != 'unknown_project':
+            if name == 'last-error.json':
+                continue
+            marker = {'state': 'unreadable', 'code': 'InvalidDiagnosticMarker',
+                      'time': None, 'scope': 'unknown_project'}
+        if marker['code'] == 'InvalidDiagnosticMarker':
+            marker['state'] = 'unreadable'
+        try:
+            raw = read_small(path)
+            value = json.loads(raw)
+            identity = value.get('epoch', value.get('legacy_epoch')) if isinstance(value, dict) else None
+            epoch = identity if isinstance(identity, str) and re.fullmatch(r'[a-f0-9]{32}|[a-f0-9]{64}', identity) else hashlib.sha256(raw).hexdigest()
+        except (OSError, ValueError, RecursionError):
+            epoch = 'unreadable'
+        candidates.append(dict(marker, epoch=epoch, legacy=name == 'last-error.json'))
+    if len(candidates) == 2 and candidates[0]['epoch'] != candidates[1]['epoch']:
+        # One atomic marker may persist while the other fails. Do not let an old
+        # dedicated file hide a newer unknown rejection visible in the summary.
+        epoch = hashlib.sha256(json.dumps([row['epoch'] for row in candidates]).encode()).hexdigest()
+        return dict(candidates[1], state='unreadable', epoch=epoch, legacy=False,
+                    inconsistent=candidates[0]['state'] != 'unreadable')
+    return candidates[0] if candidates else None

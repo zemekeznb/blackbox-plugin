@@ -93,6 +93,12 @@ test('history exposes session capture gaps and project-specific diagnostic marke
   await h.run('captureStatus()');
   assert.ok(h.get('capture-projects').children.some(node=>/SessionCapacityReached/.test(node.textContent)));
 });
+test('history distinguishes unknown rejection from confirmed session gaps',async()=>{
+  const h=harness(),data=record();data.events=[{seq:1,kind:'PostToolUse',content:JSON.stringify({_coverage:{capture_gap_before:true,capture_gap_scope:'unknown_project'}})}];
+  h.context.fetch=async()=>({ok:true,json:async()=>data});await h.run("openRecord('a')");
+  assert.match(h.get('status').textContent,/归属未知/);assert.match(h.get('status').textContent,/不能断言/);
+  assert.doesNotMatch(h.get('status').textContent,/该会话存在已知采集缺口/);
+});
 test('empty search and list refresh preserve reader status', async()=>{
   const h=harness(); h.get('query').value='missing'; h.get('status').textContent='reading version 1';
   await h.run('list()');

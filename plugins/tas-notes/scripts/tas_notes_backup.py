@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 
-from tas_notes_core import NotesError
+from tas_notes_core import NotesError, diagnostic
 
 
 def readonly(path):
@@ -89,12 +89,23 @@ def restore(source, destination):
             target.commit()
         if verify(database) != expected:
             raise NotesError('restored row counts differ')
+        # SQLite backups do not carry pending filesystem rejection markers.
+        # New capture must not bridge an archived session across this restore.
+        # This is continuity metadata, not evidence that any event was lost.
+        from tas_notes_diagnostics import unscoped_error
+        diagnostic(destination, 'RestoreContinuityUnknown')
+        boundary = unscoped_error(destination)
+        if (not boundary or boundary['state'] != 'recorded'
+                or boundary['code'] != 'RestoreContinuityUnknown'):
+            raise NotesError('restored capture continuity marker could not be saved')
         return {'restored_state': str(destination), 'verified': True,
                 'counts': expected, 'all_projects_disabled': True,
+                'capture_continuity': 'unknown_after_restore',
                 'runtime_configured': False}
     except BaseException:
-        # Only this new directory and our own SQLite files can exist here.
-        for name in ('notes.sqlite3-journal', 'notes.sqlite3-wal', 'notes.sqlite3-shm', 'notes.sqlite3'):
+        # Only this new directory and our own restoration files can exist here.
+        for name in ('notes.sqlite3-journal', 'notes.sqlite3-wal', 'notes.sqlite3-shm', 'notes.sqlite3',
+                     'capture-unknown.json', 'last-error.json'):
             (destination / name).unlink(missing_ok=True)
         destination.rmdir()
         raise

@@ -6,7 +6,7 @@ import re
 
 from tas_notes_core import NotesError, canonical
 
-RULE_VERSION = 'observed-errors-2'
+RULE_VERSION = 'observed-errors-3'
 COVERAGE = ('仅识别 Bash 返回中的完整 Python traceback 或指定 PowerShell 诊断格式；'
             '格式命中不是已验证故障，打印日志也可能命中。未验证的退出状态、内部重试及拒绝可能漏记。'
             '空返回不表示成功；没有匹配记录不代表没有问题。')
@@ -103,10 +103,58 @@ def positive(value, default):
     return int(value)
 
 
-def listing(store, project='', tool='', start='', end='', before=None, through=None):
+def context_filter(project_path='', investigation=''):
+    # These are exact stored identifiers, not paths to resolve or newly authorize.
+    for value, limit in ((project_path, 32767), (investigation, 200)):
+        if not isinstance(value, str) or len(value) > limit:
+            raise NotesError('invalid context filter')
+
+
+def contexts(store, project_path=''):
+    """Read scalar navigation metadata without loading prompts or event bodies."""
+    context_filter(project_path)
+    with store.connect() as db:
+        db.execute('BEGIN')
+        projects = [{'path': row['path'], 'enabled': bool(row['enabled']),
+                     'last_captured': row['last_captured']}
+                    for row in db.execute('''
+                        SELECT p.path,p.enabled,MAX(e.captured) AS last_captured
+                        FROM projects p JOIN investigations i ON i.project=p.path
+                        JOIN events e ON e.investigation=i.id
+                        GROUP BY p.path ORDER BY MAX(e.seq) DESC,p.path''')]
+        sessions = [dict(row) for row in db.execute('''
+            SELECT i.id,i.session,MIN(e.captured) AS first_captured,
+                MAX(e.captured) AS last_captured
+            FROM investigations i JOIN events e ON e.investigation=i.id
+            WHERE i.project=? GROUP BY i.id
+            ORDER BY MAX(e.seq) DESC,i.id''', (project_path,))] if project_path else []
+        db.commit()
+    return {'projects': projects, 'sessions': sessions}
+
+
+def saved_sessions(store, identifiers):
+    """Resolve only known, event-bearing records; never accept arbitrary host IDs."""
+    if (not isinstance(identifiers, list) or not 1 <= len(identifiers) <= 20
+            or any(not isinstance(value, str) or not value or len(value) > 200
+                   for value in identifiers)):
+        raise NotesError('invalid session selection')
+    identifiers = list(dict.fromkeys(identifiers))
+    with store.connect() as db:
+        rows = db.execute('''SELECT i.id,i.session,i.project FROM investigations i
+            WHERE i.id IN (''' + ','.join('?' for _ in identifiers) + ''')
+            AND EXISTS(SELECT 1 FROM events e WHERE e.investigation=i.id)''', identifiers).fetchall()
+    result = {row['id']: {'session': row['session'], 'project_path': row['project']} for row in rows}
+    if len(result) != len(identifiers):
+        raise NotesError('unknown session selection')
+    return result
+
+
+def listing(store, project='', tool='', start='', end='', before=None, through=None,
+            project_path='', investigation=''):
     for value in (project, tool):
         if not isinstance(value, str) or len(value) > 200:
             raise NotesError('invalid filter')
+    context_filter(project_path, investigation)
     dates = []
     for value in (start, end):
         try:
@@ -130,11 +178,13 @@ def listing(store, project='', tool='', start='', end='', before=None, through=N
         snapshot = 0 if zero_snapshot else positive(through, latest)
         if isinstance(through, bool) or snapshot > latest:
             raise NotesError('invalid snapshot')
-        rows = db.execute('''SELECT e.seq,e.captured,e.content,i.project
+        rows = db.execute('''SELECT e.seq,e.captured,e.content,i.project,i.session,i.id AS investigation
             FROM events e
             JOIN investigations i ON i.id=e.investigation
             WHERE e.kind='PostToolUse' AND e.seq<? AND e.seq<=?
-            ORDER BY e.seq DESC LIMIT ?''', (upper, snapshot, MAX_SCAN + 1)).fetchall()
+                AND (?='' OR i.project=?) AND (?='' OR i.id=?)
+            ORDER BY e.seq DESC LIMIT ?''', (upper, snapshot, project_path, project_path,
+                                           investigation, investigation, MAX_SCAN + 1)).fetchall()
         # Rows are materialized from one snapshot; release the read lock before
         # parsing potentially large tool output so capture writes can proceed.
         db.commit()
@@ -152,6 +202,7 @@ def listing(store, project='', tool='', start='', end='', before=None, through=N
                 continue
             items.append({'id': str(row['seq']), 'title': hit['title'], 'tool': name,
                           'signal': hit['signal'],
+                          'investigation': row['investigation'], 'session': row['session'],
                           'project': row['project'], 'captured': row['captured']})
             if len(items) == PAGE_SIZE:
                 break
@@ -199,15 +250,25 @@ def detail(store, identifier, through=None):
                           (first['investigation'], seq, bound)).fetchall()
         db.commit()
     linked, key = [], target_key(content)
+    legacy_association_boundary = content.get('_coverage', {}).get('capture_boundary_version') != 1
+    if legacy_association_boundary:
+        key = None
     capture_gap = bool(content.get('_coverage', {}).get('capture_gap_before'))
+    capture_gap_scope = content.get('_coverage', {}).get('capture_gap_scope') if capture_gap else None
+    capture_gap_reason = content.get('_coverage', {}).get('capture_gap_reason') if capture_gap else None
     first_turn = content.get('turn_id')
     first_turn = first_turn if isinstance(first_turn, str) and first_turn else None
     for row in rows:
         if row['kind'] in ('UserPromptSubmit', 'Stop', 'Interrupt', 'SessionEnd'):
             break
         other = json.loads(row['content'])
+        if other.get('_coverage', {}).get('capture_boundary_version') != 1:
+            legacy_association_boundary = True
+            break
         if other.get('_coverage', {}).get('capture_gap_before'):
             capture_gap = True
+            capture_gap_scope = other.get('_coverage', {}).get('capture_gap_scope')
+            capture_gap_reason = other.get('_coverage', {}).get('capture_gap_reason')
             break
         turn = other.get('turn_id')
         turn = turn if isinstance(turn, str) and turn else None
@@ -226,21 +287,23 @@ def detail(store, identifier, through=None):
     events = [dict(first)] + linked
     body = ['# ' + hit['title'], '', '> 按工具返回格式识别的观察记录；不是独立验证的 Bug 或修复结论。',
             '', '## 记录范围', '', '项目：', '', fenced(first['project']), '',
+            '会话：', '', fenced(first['session']), '',
+            '- 会话记录 ID：' + first['investigation'],
             '- 记录时间（本机落盘）：' + first['captured'],
             '- 来源事件：#' + str(seq), '- 规则：' + RULE_VERSION + '/' + hit['rule'],
             '- 快照截至事件：#' + str(bound), '', '## 执行操作', '',
             fenced(operation(content)), '', '## 错误返回', '', fenced(hit['evidence'])]
+    readable_outputs = [hit['evidence']]
     for row in linked:
         other = json.loads(row['content'])
+        readable_outputs.append(other.get('tool_response', '未捕获返回'))
         body += ['', '## 相同输入再次调用 · 来源 #' + str(row['seq']), '',
                  '> 依据：同一会话的已捕获边界内，相同工具及完整参数；不是处理意图或修复关系的证明。', '',
                  fenced(operation(other)), '', '### 返回结果', '',
                  fenced(other.get('tool_response', '未捕获返回'))]
         if not other.get('tool_response'):
             body += ['', '> 空返回不表示成功。']
-    if not linked:
-        body += ['', '> 未捕获到符合边界规则的相同输入再次调用。']
-    body += ['', '## 已保存来源', '']
+    body += ['', '## 技术详情 · 已保存来源', '']
     for event in events:
         body += ['### 来源 #' + str(event['seq']), '', 'SHA-256：' + event['digest'], '',
                  fenced(json.loads(event['content'])), '']
@@ -252,12 +315,25 @@ def detail(store, identifier, through=None):
     if any(json.loads(e['content']).get('_coverage', {}).get('truncated_fields') for e in events):
         body += ['', '> 部分来源字段已截断，请以来源标记为准。']
     if capture_gap:
-        body += ['', '> 当前会话存在已知采集缺口，不能证明跨缺口的回合和操作关系；已停止自动关联。']
-    if any('\ufffd' in e['content'] for e in events):
-        body += ['', '> 来源含编码替换字符，原始文字可能已丢失。']
+        if capture_gap_scope == 'unknown_project' and capture_gap_reason == 'restored_store':
+            body += ['', '> 备份恢复后的采集连续性未知，已停止跨恢复边界自动关联；这不证明发生过采集错误或丢失了事件。']
+        elif capture_gap_scope == 'unknown_project' and capture_gap_reason == 'diagnostic_unreadable':
+            body += ['', '> 采集诊断不可读或不一致，无法确定事件连续性，已保守停止自动关联；这不证明当前会话丢失了事件。']
+        elif capture_gap_scope == 'unknown_project':
+            body += ['', '> 存在无法确定所属项目或会话的采集拒收；为避免跨缺口误关联，已保守停止自动关联。这不证明当前会话丢失了事件。']
+        else:
+            body += ['', '> 当前会话存在已知采集缺口，不能证明跨缺口的回合和操作关系；已停止自动关联。']
+    if legacy_association_boundary:
+        body += ['', '> 旧来源未保存完整采集边界，未自动关联后续调用；来源仍按原样保留。这不证明旧会话实际丢失了事件。']
+    if any('\ufffd' in fenced(output) for output in readable_outputs):
+        body += ['', '> 部分文字可能显示不完整。']
     return {'id': str(seq), 'title': hit['title'], 'project': first['project'],
+            'investigation': first['investigation'], 'session': first['session'],
             'tool': content.get('tool_name'), 'captured': first['captured'],
             'source_seq': bound, 'rule_version': RULE_VERSION, 'events': events,
             'signal': hit['signal'], 'association': 'same-input-repeat',
             'capture_gap': capture_gap,
+            'capture_gap_scope': capture_gap_scope,
+            'capture_gap_reason': capture_gap_reason,
+            'legacy_association_boundary': legacy_association_boundary,
             'markdown': '\n'.join(body) + '\n'}

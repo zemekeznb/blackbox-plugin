@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+import tempfile
 import time
 import threading
 from urllib.parse import parse_qs, urlsplit
@@ -17,10 +18,63 @@ from tas_notes_core import NotesError
 ASSETS = Path(__file__).resolve().parent.parent / 'assets'
 
 
+class ReaderSelection:
+    """Persist only a reading preference, independently from captured evidence."""
+    def __init__(self, store):
+        self.store = store
+        self.path = store.directory / 'reader-selection.json'
+        self.lock = threading.Lock()
+
+    def get(self):
+        from tas_notes_anomalies import saved_sessions
+        empty = {'investigation': None, 'project_path': None}
+        try:
+            with self.lock:
+                if self.path.is_symlink():
+                    return empty
+                with self.path.open('rb') as source:
+                    raw = source.read(1025)
+            if len(raw) > 1024:
+                return empty
+            value = json.loads(raw)
+            if not isinstance(value, dict) or set(value) != {'investigation'}:
+                return empty
+            identifier = value['investigation']
+            saved = saved_sessions(self.store, [identifier])
+            return {'investigation': identifier, 'project_path': saved[identifier]['project_path']}
+        except (OSError, ValueError, NotesError):
+            return empty
+
+    def set(self, value):
+        from tas_notes_anomalies import saved_sessions
+        if not isinstance(value, dict) or set(value) != {'investigation'}:
+            raise NotesError('invalid reader selection')
+        identifier = value['investigation']
+        saved = saved_sessions(self.store, [identifier])
+        temporary = None
+        with self.lock:
+            try:
+                with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                        dir=self.store.directory, prefix='reader-selection-', suffix='.tmp',
+                        delete=False) as output:
+                    temporary = Path(output.name)
+                    json.dump({'investigation': identifier}, output, ensure_ascii=False)
+                    output.flush()
+                    os.fsync(output.fileno())
+                temporary.replace(self.path)
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+        return {'investigation': identifier, 'project_path': saved[identifier]['project_path']}
+
+
 def make_server(store, token=None):
     token = token or secrets.token_urlsafe(32)
     from tas_notes_launcher import runtime_metadata
+    from tas_notes_codex import SessionNames
     runtime = runtime_metadata(store)
+    names = SessionNames()
+    selection = ReaderSelection(store)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -110,7 +164,23 @@ def make_server(store, token=None):
                     from tas_notes_anomalies import listing
                     query = parse_qs(request.query)
                     self.send(200, listing(store, **{key: query.get(key, [''])[0]
-                        for key in ('project', 'tool', 'start', 'end', 'before', 'through')}))
+                        for key in ('project', 'tool', 'start', 'end', 'before', 'through',
+                                    'project_path', 'investigation')}))
+                elif request.path == '/api/anomaly-contexts':
+                    from tas_notes_anomalies import contexts
+                    self.send(200, contexts(store, parse_qs(request.query).get('project_path', [''])[0]))
+                elif request.path == '/api/session-names':
+                    from tas_notes_anomalies import saved_sessions
+                    try:
+                        query = parse_qs(request.query, keep_blank_values=True, max_num_fields=20)
+                    except ValueError:
+                        raise NotesError('invalid session names request') from None
+                    if set(query) != {'investigation'}:
+                        raise NotesError('invalid session names request')
+                    saved = saved_sessions(store, query['investigation'])
+                    self.send(200, {'names': names.names({key: value['session'] for key, value in saved.items()})})
+                elif request.path == '/api/reader-selection':
+                    self.send(200, selection.get())
                 elif request.path.startswith('/api/anomaly/') or request.path.startswith('/api/anomaly-export/'):
                     from tas_notes_anomalies import detail, RULE_VERSION
                     query = parse_qs(request.query)
@@ -139,6 +209,30 @@ def make_server(store, token=None):
             if self.path == '/api/revisions':
                 self.send(410, {'error': 'history_is_read_only'})
                 return
+            if self.path == '/api/reader-selection':
+                try:
+                    if (self.headers.get('Transfer-Encoding')
+                            or len(self.headers.get_all('Content-Length', [])) != 1
+                            or self.headers.get_content_type() != 'application/json'):
+                        raise NotesError('invalid reader selection body')
+                    try:
+                        length = int(self.headers['Content-Length'])
+                    except ValueError:
+                        raise NotesError('invalid reader selection length') from None
+                    if not 0 < length <= 1024:
+                        raise NotesError('invalid reader selection length')
+                    body = self.rfile.read(length)
+                    self.body_consumed = True
+                    try:
+                        value = json.loads(body)
+                    except (ValueError, UnicodeError):
+                        raise NotesError('invalid reader selection JSON') from None
+                    self.send(200, selection.set(value))
+                except NotesError:
+                    self.send(400, {'error': 'invalid_request'})
+                except (sqlite3.Error, OSError):
+                    self.send(503, {'error': 'local_store_unavailable'})
+                return
             if self.path != '/api/shutdown':
                 self.send(404, {'error': 'not_found'})
                 return
@@ -151,7 +245,14 @@ def make_server(store, token=None):
             self.send(200, {'stopping': True})
             threading.Thread(target=self.server.shutdown, daemon=True).start()
 
-    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    class ReadingServer(ThreadingHTTPServer):
+        def server_close(self):
+            try:
+                super().server_close()
+            finally:
+                names.close()
+
+    server = ReadingServer(('127.0.0.1', 0), Handler)
     server.daemon_threads = True
     return server, token
 
