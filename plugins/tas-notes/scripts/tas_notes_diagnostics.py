@@ -44,7 +44,7 @@ def read_error(path, scope):
         known = {'NotesError', 'Conflict', 'JSONDecodeError', 'UnicodeDecodeError',
                  'ValueError', 'RecursionError', 'OperationalError', 'IntegrityError',
                  'DatabaseError', 'OSError', 'PermissionError', 'FileNotFoundError',
-                 'LauncherNotConfigured', 'LauncherRuntimeFailed', 'InputTooLarge',
+                 'SessionIdentityUnconfirmed', 'LauncherNotConfigured', 'LauncherRuntimeFailed', 'InputTooLarge',
                  'DatabaseCapacityReached', 'SessionCapacityReached',
                  'UnknownCaptureError', 'InvalidDiagnosticMarker', 'RestoreContinuityUnknown'}
         code = value.get('code')

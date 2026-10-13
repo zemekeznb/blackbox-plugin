@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../plugins/tas-notes/assets/review.js'), 'utf8');
 function harness(filePreview=false) {
-  const elements = new Map(), downloads = [];
+  const elements = new Map(), downloads = [], blobs = [];
   function node(tag='div') {
     return {tagName:tag.toUpperCase(), value:'', textContent:'', hidden:false, children:[], dataset:{}, attrs:{},
       append(...items){this.children.push(...items);}, replaceChildren(){this.children=[];},
@@ -16,40 +16,129 @@ function harness(filePreview=false) {
   }
   const get = id => {if(!elements.has(id)) elements.set(id,node()); return elements.get(id);};
   const context = vm.createContext({document:{getElementById:get,createElement:node,createTextNode:x=>x},
-    location:{hash:'#token=test',protocol:filePreview?'file:':'http:'}, URLSearchParams, AbortSignal, URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},
+    location:{hash:'#token=test',protocol:filePreview?'file:':'http:'}, URLSearchParams, AbortSignal, Blob,
+    URL:{createObjectURL:blob=> {blobs.push(blob);return 'blob:test';},revokeObjectURL(){}},
     window:{addEventListener(){}}, confirm:()=>true, setTimeout(){},
     fetch:async()=>({ok:true,json:async()=>[]})});
   // Suppress only the two page-load requests; real functions below remain unchanged.
   vm.runInContext(filePreview ? source : source.slice(0,source.indexOf("if (location.protocol === 'file:')")),context);
-  return {context,get,downloads,run:s=>vm.runInContext(s,context)};
+  return {context,get,downloads,blobs,run:s=>vm.runInContext(s,context)};
 }
 function record() { return {id:'a',project:'test',display_title:'title',overview:'overview',events:[],source_seq:0}; }
-test('download retains original record and revision when selection changes mid-request', async()=>{
+test('late export response cannot preview or download a different selection', async()=>{
   const h=harness(); let resolve;
   h.context.fetch=()=>new Promise(r=>{resolve=r;});
   h.run("selected={id:'a'};selectedRevision={id:'rev-a',number:1}");
   const pending=h.run('exportSaved()');
   h.run("selected={id:'b'};selectedRevision={id:'rev-b',number:9}");
-  resolve({ok:true,blob:async()=>({})}); await pending;
-  assert.deepEqual(h.downloads,['investigation-a-v1.md']);
+  resolve({ok:true,text:async()=> 'old revision content'}); await pending;
+  h.run('downloadSavedPreview()');
+  assert.deepEqual(h.downloads,[]);
+  assert.equal(h.run('exportSnapshot'),null);
 });
 test('every historical revision remains readable and exportable without a write workflow', async()=>{
   const h=harness();let posts=0, exportUrl;
   const data=record();data.revisions=[{id:'one',number:1,title:'old title',body:'first saved text',source_seq:1},
     {id:'two',number:2,title:'new title',body:'second saved text',source_seq:2}];
-  h.context.fetch=async(url,opts)=>{if(opts.method==='POST') posts++;exportUrl=url;return {ok:true,json:async()=>data,blob:async()=>({})};};
+  h.context.fetch=async(url,opts)=>{if(opts.method==='POST') posts++;exportUrl=url;return {ok:true,json:async()=>data,text:async()=> '# full revision\nfirst saved text'};};
   await h.run("openRecord('a')");
   assert.equal(h.get('revision').children.length,3);
   assert.equal(h.run('selectedRevision.id'),'two');
   h.run("selectRevision('one')");assert.equal(h.get('record-heading').textContent,'old title');
   assert.equal(h.get('export').disabled,false);
   await h.run('exportSaved()');assert.equal(exportUrl,'/api/export/one');
+  assert.deepEqual(h.downloads,[]);
+  h.run('downloadSavedPreview()');
   assert.deepEqual(h.downloads,['investigation-a-v1.md']);
   h.run("selectRevision('')");assert.equal(h.get('export').disabled,true);
   assert.equal(h.run('typeof save'),'undefined');assert.equal(posts,0);
   const html=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/review.html'),'utf8');
   assert.doesNotMatch(html,/<textarea|id="save"|id="summary-request"|id="editor"/);
   assert.doesNotMatch(source,/api\/revisions|api\/summar|beforeunload/);
+});
+
+test('preview is the full inert Markdown and download reuses exactly those bytes without a request',async()=>{
+  const h=harness();let requests=0;
+  const content='# 完整人工版本\r\n\r\n<script>bad()</script> <img src=https://example.org/pixel>\nsecret=fixture\n';
+  h.run("selected={id:'a'};selectedRevision={id:'rev-a',number:2}");
+  h.context.fetch=async()=>{requests++;return {ok:true,text:async()=>content};};
+  await h.run('exportSaved()');
+  assert.equal(h.get('export-preview').hidden,false);
+  assert.equal(h.get('export-preview-text').textContent,content);
+  assert.equal(h.get('export-preview-text').children.length,0);
+  assert.equal(h.get('export-download').disabled,false);
+  assert.deepEqual(h.downloads,[]);
+  h.context.fetch=async()=>{throw new Error('download must not fetch');};
+  h.run('downloadSavedPreview()');
+  assert.equal(requests,1);
+  assert.deepEqual(h.downloads,['investigation-a-v2.md']);
+  assert.equal(await h.blobs[0].text(),content);
+  assert.equal(h.run('Object.isFrozen(exportSnapshot)'),true);
+  assert.doesNotMatch(source,/innerHTML/);
+});
+
+test('switching revision clears preview and ignores a late text body',async()=>{
+  const h=harness();let resolveBody;
+  const data=record();data.revisions=[{id:'one',number:1,title:'one',body:'first'},
+    {id:'two',number:2,title:'two',body:'second'}];
+  h.context.data=data;h.run("selected=data;selectRevision('one')");
+  h.context.fetch=async()=>({ok:true,text:()=>new Promise(resolve=>{resolveBody=resolve;})});
+  const pending=h.run('exportSaved()');
+  await new Promise(resolve=>setImmediate(resolve));
+  h.run("selectRevision('two')");
+  resolveBody('late first revision');await pending;
+  assert.equal(h.get('export-preview').hidden,true);
+  assert.equal(h.get('export-preview-text').textContent,'');
+  assert.equal(h.get('export-download').disabled,true);
+  h.run('downloadSavedPreview()');assert.deepEqual(h.downloads,[]);
+});
+
+test('opening another record immediately cancels preview and blocks old export during loading',async()=>{
+  const h=harness();let resolveRecord;
+  h.run("selected={id:'a'};selectedRevision={id:'rev-a',number:1}");
+  h.context.fetch=async()=>({ok:true,text:async()=> 'first complete export'});
+  await h.run('exportSaved()');
+  h.context.fetch=()=>new Promise(resolve=>{resolveRecord=resolve;});
+  const opening=h.run("openRecord('b')");
+  assert.equal(h.get('export-preview').hidden,true);
+  assert.equal(h.get('export').disabled,true);
+  h.run('downloadSavedPreview()');
+  await h.run('exportSaved()');
+  assert.deepEqual(h.downloads,[]);
+  resolveRecord({ok:true,json:async()=>({...record(),id:'b'})});await opening;
+  assert.equal(h.run('selected.id'),'b');
+  assert.equal(h.run('exportSnapshot'),null);
+});
+
+test('preview failure can retry and closing cancels late responses',async()=>{
+  const h=harness();let resolve;
+  h.run("selected={id:'a'};selectedRevision={id:'rev-a',number:1}");
+  h.context.fetch=async()=>{throw new Error('fixture network failure');};
+  await h.run('exportSaved()');
+  assert.match(h.get('export-preview-status').textContent,/预览读取失败/);
+  assert.equal(h.get('export').disabled,false);
+  assert.equal(h.get('export-download').disabled,true);
+  h.context.fetch=async()=>({ok:true,text:async()=> 'retry fixed content'});
+  await h.run('exportSaved()');
+  assert.equal(h.get('export-preview-text').textContent,'retry fixed content');
+  h.context.fetch=()=>new Promise(r=>{resolve=r;});
+  const pending=h.run('exportSaved()');
+  h.run('cancelExportPreview()');
+  resolve({ok:true,text:async()=> 'closed late response'});await pending;
+  assert.equal(h.get('export-preview').hidden,true);
+  assert.equal(h.run('exportSnapshot'),null);
+});
+
+test('newer preview wins even when older request completes last',async()=>{
+  const h=harness(),pending=[];
+  h.run("selected={id:'a'};selectedRevision={id:'rev-a',number:1}");
+  h.context.fetch=()=>new Promise(resolve=>pending.push(resolve));
+  const older=h.run('exportSaved()'),newer=h.run('exportSaved()');
+  pending[1]({ok:true,text:async()=> 'newer preview copy'});await newer;
+  pending[0]({ok:true,text:async()=> 'older delayed copy'});await older;
+  h.run('downloadSavedPreview()');
+  assert.equal(h.get('export-preview-text').textContent,'newer preview copy');
+  assert.equal(await h.blobs[0].text(),'newer preview copy');
 });
 test('all saved model summaries remain readable and distinct from original events', async()=>{
   const h=harness(), data=record();

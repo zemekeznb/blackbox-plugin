@@ -27,10 +27,16 @@
       <div id="empty"><h2>从列表选择一份记录</h2><p>停用项目的历史也会保留。自动摘录、模型总结与人工版本分别展示。</p></div>
       <div id="detail" hidden>
         <h2 id="record-heading">历史会话</h2><p id="meta" class="muted"></p>
-        <p class="notice">回合结束不代表问题解决。历史模型解释和人工结论均不等于独立验证。</p>
         <label for="revision">选择阅读版本</label><select id="revision"></select>
         <p id="reading-state" class="notice"></p>
-        <div class="actions"><button id="export" disabled>下载所选人工版本</button></div>
+        <div class="actions"><button id="export" disabled>预览并导出所选人工版本</button></div>
+        <section id="export-preview" class="export-preview" aria-label="完整导出预览" hidden>
+          <h3 id="export-preview-heading">完整导出预览</h3>
+          <p class="notice">以下是实际下载的完整内容。有限脱敏不能保证清除正文中的密码、密钥或个人信息，请在分享前检查；下载不会上传。</p>
+          <p id="export-preview-status" role="status" aria-live="polite"></p>
+          <pre id="export-preview-text" aria-label="将要下载的完整 Markdown"></pre>
+          <div class="actions"><button id="export-download" disabled>下载已预览副本</button><button id="export-close">关闭预览</button></div>
+        </section>
         <article id="reading" aria-label="过程记录"></article>
         <details><summary>已保存的全部历史模型总结</summary><div id="summaries"></div></details>
         <details><summary>查看捕获的事件与来源</summary><div id="events"></div></details>

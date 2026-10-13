@@ -16,6 +16,9 @@ for number, command, output in [
     (1, 'python export_model.py', 'Traceback (most recent call last):\n  File "export_model.py", line 8, in <module>\nFileNotFoundError: output/model.blend\n'),
     (2, 'python export_model.py', 'Export finished: output/model.blend'),
     (3, 'python read_material.py', 'Traceback (most recent call last):\n  File "read_material.py", line 3, in <module>\njson.decoder.JSONDecodeError: Expecting property name: line 1 column 2\n')]:
+    if '--long' in sys.argv and number == 3:
+        command += '\n' + '\n'.join(f'# synthetic input line {i}' for i in range(100))
+        output = output.replace('json.decoder.JSONDecodeError:', 'json.decoder.JSONDecodeError: ' + 'synthetic long error detail ' * 250 + '\ufffd\n')
     store.record({'cwd':str(project),'session_id':'synthetic-preview','hook_event_name':'PostToolUse',
                   'tool_use_id':str(number),'tool_name':'Bash','tool_input':{'command':command},'tool_response':output})
 store.set_project(str(project), False)

@@ -165,8 +165,13 @@ class SessionNames:
                     process.stdout.close()
         return dict(found)
 
-    @staticmethod
-    def _exchange(process, sessions, found):
+    def _thread_value(self, thread):
+        return display_name(thread.get('name'))
+
+    def _thread_error(self, reply):
+        return None
+
+    def _exchange(self, process, sessions, found):
         consumed = 0
 
         def send(value):
@@ -198,12 +203,112 @@ class SessionNames:
                 send({'id': identifier, 'method': 'thread/read',
                       'params': {'threadId': session, 'includeTurns': False}})
                 reply = receive(identifier)
+                for _ in range(getattr(self, 'READ_ATTEMPTS', 1)-1):
+                    if 'error' not in reply or self._thread_error(reply) != 'unconfirmed':
+                        break
+                    time.sleep(0.15)
+                    send({'id': identifier, 'method': 'thread/read', 'params': {'threadId': session, 'includeTurns': False}})
+                    reply = receive(identifier)
                 if 'error' in reply:
+                    found[session] = self._thread_error(reply)
                     continue
                 result = reply.get('result')
                 thread = result.get('thread') if isinstance(result, dict) else None
                 # Ignore previews, paths and every other field returned by Codex.
                 if isinstance(thread, dict) and thread.get('id') == session:
-                    found[session] = display_name(thread.get('name'))
+                    found[session] = self._thread_value(thread)
         except (OSError, ValueError, TypeError, RecursionError):
             return  # Unavailable titles are cached briefly; no content logging.
+
+
+class SessionMetadata(SessionNames):
+    def _thread_value(self, thread):
+        name = display_name(thread.get('name'))
+        return {'name': name, 'status': 'named' if name else 'untitled'}
+
+    def _thread_error(self, reply):
+        error = reply.get('error', {})
+        if not isinstance(error, dict):
+            return {'name': None, 'status': 'unavailable'}
+        # This specific host response does not prove deletion or archival.
+        missing = error.get('code') == -32600 and str(error.get('message', '')).startswith('thread not loaded:')
+        return {'name': None, 'status': 'unlinked' if missing else 'unavailable'}
+
+
+def session_labels(provider, sessions):
+    values = provider.names(sessions)
+    return {'names': {key: value.get('name') if isinstance(value, dict) else value for key, value in values.items()},
+            'states': {key: value.get('status', 'unavailable') if isinstance(value, dict)
+                       else 'named' if value else 'unavailable' for key, value in values.items()}}
+
+
+class ProjectCatalog(SessionNames):
+    """Read bounded project labels/roots, never threads or project files."""
+    @staticmethod
+    def _exchange(process, sessions, found):
+        consumed = 0
+        def call(identifier, method, params):
+            nonlocal consumed
+            process.stdin.write((json.dumps({'id':identifier,'method':method,'params':params})+'\n').encode())
+            process.stdin.flush()
+            while True:
+                line = process.stdout.readline(MAX_LINE_BYTES+1); consumed += len(line)
+                if not line or len(line)>MAX_LINE_BYTES or consumed>MAX_OUTPUT_BYTES:
+                    raise ValueError('bounded project metadata unavailable')
+                reply=json.loads(line)
+                if not isinstance(reply,dict) or ('id' in reply and 'method' in reply):
+                    raise ValueError('invalid project response')
+                if reply.get('id')==identifier:
+                    if 'error' in reply: raise ValueError('project metadata unavailable')
+                    return reply.get('result',{})
+        try:
+            call(1,'initialize',{'clientInfo':{'name':'blackbox-projects','version':'1'},'capabilities':{'experimentalApi':True}})
+            process.stdin.write(b'{"method":"initialized"}\n');process.stdin.flush()
+            result=[];cursor=None
+            for identifier in range(2,7):
+                page=call(identifier,'project/list',{'limit':100,**({'cursor':cursor} if cursor else {})})
+                for project in page.get('data',[]):
+                    name=display_name(project.get('name'))
+                    roots=[root['path'] for root in project.get('roots',[]) if isinstance(root,dict)
+                           and isinstance(root.get('path'),str) and len(root['path'])<=4096]
+                    if name and isinstance(project.get('id'),str) and roots:
+                        result.append({'id':project['id'],'name':name,'roots':roots})
+                cursor=page.get('nextCursor')
+                if not cursor:
+                    found['catalog']=result;return
+            # Partial catalog could incorrectly resolve overlapping roots.
+        except (OSError,ValueError,TypeError,KeyError,AttributeError,RecursionError):
+            return
+
+    def projects(self):
+        return self.names({'catalog':'catalog'}).get('catalog') or []
+
+
+def navigation_contexts(store, project_path, catalog):
+    import ntpath
+    from tas_notes_anomalies import contexts
+    data=contexts(store)
+    hosted=catalog.projects()
+    groups={}
+    for saved in data['projects']:
+        matches=[p for p in hosted if any(ntpath.normcase(ntpath.normpath(saved['path'])) ==
+                 ntpath.normcase(ntpath.normpath(root)) for root in p['roots'])]
+        host=matches[0] if len(matches)==1 else None
+        key=host['id'] if host else saved['path']
+        if key not in groups:
+            groups[key]={**saved,'name':host['name'] if host else None,
+                         'host_id':host['id'] if host else None,'paths':[]}
+        groups[key]['paths'].append(saved['path'])
+    sessions=[]
+    if project_path:
+        # Validate the input with the existing scalar contract even if unmatched.
+        contexts(store,project_path)
+        group=next((g for g in groups.values() if project_path in g['paths']),None)
+        for path in group['paths'] if group else [project_path]:
+            sessions.extend({**s,'project':path} for s in contexts(store,path)['sessions'])
+        sessions.sort(key=lambda s:s['last_captured'],reverse=True)
+    result = {'projects':list(groups.values()),'sessions':sessions}
+    if not project_path:
+        from tas_notes_anomalies import anomaly_presence
+        result['workspace_has_anomalies'] = anomaly_presence(store)['has_anomalies']
+    return result

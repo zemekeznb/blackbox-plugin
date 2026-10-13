@@ -1,0 +1,1 @@
+{"name":"blackbox-lab","interface":{"displayName":"Blackbox Local Lab"},"plugins":[{"name":"blackbox-entry-probe","source":{"source":"local","path":"./plugin"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"}]}

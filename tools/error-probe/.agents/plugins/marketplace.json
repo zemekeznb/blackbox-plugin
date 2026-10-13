@@ -1,0 +1,1 @@
+{"name":"blackbox-error-lab","interface":{"displayName":"Blackbox Error Test Lab"},"plugins":[{"name":"blackbox-error-probe","source":{"source":"local","path":"./plugin"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"}]}

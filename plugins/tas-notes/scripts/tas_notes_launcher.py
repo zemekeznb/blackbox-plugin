@@ -199,11 +199,6 @@ def probe_instance(value, expected_state=None):
         connection.close()
 
 
-def healthy(value, build):
-    data = probe_instance(value)
-    return data is not None and data['build'] == build
-
-
 def probe_with_retry(value, expected_state=None):
     for attempt in range(3):
         data = probe_instance(value, expected_state)

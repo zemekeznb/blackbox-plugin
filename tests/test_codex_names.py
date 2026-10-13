@@ -265,7 +265,7 @@ class ReadingMetadataTests(unittest.TestCase):
                     self.assertEqual(request(path)[0], 400)
                 names.assert_not_called()
                 status, result = request(query)
-                self.assertEqual((status, result), (200, {'names': {self.identifiers[0]: 'Real title'}}))
+                self.assertEqual((status, result), (200, {'names': {self.identifiers[0]: 'Real title'}, 'states': {self.identifiers[0]: 'named'}}))
                 names.assert_called_once_with({self.identifiers[0]: 'thread-0'})
                 self.assertEqual(request('/api/reader-selection', auth=False)[0], 401)
                 self.assertIsNone(request('/api/reader-selection')[1]['investigation'])
@@ -286,3 +286,39 @@ class ReadingMetadataTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class HostNavigationTests(unittest.TestCase):
+    def test_distinguishes_missing_untitled_and_transient_without_returning_error_text(self):
+        provider=c.SessionMetadata()
+        self.assertEqual(provider._thread_value({'name':'Real'}),{'name':'Real','status':'named'})
+        self.assertEqual(provider._thread_value({'name':None})['status'],'untitled')
+        self.assertEqual(provider._thread_error({'error':{'code':-32600,'message':'thread not loaded: id'}})['status'],'unlinked')
+        self.assertEqual(provider._thread_error({'error':{'code':-1,'message':'private error'}})['status'],'unavailable')
+
+    def test_catalog_reads_only_bounded_project_metadata(self):
+        process=FakeProcess([{'id':1,'result':{}},{'id':2,'result':{'data':[{'id':'p','name':'Codex label','roots':[{'path':'D:/one'},{'path':'D:/two'}],'private':'ignored'}]}}])
+        found={};c.ProjectCatalog._exchange(process,[],found)
+        self.assertEqual(found,{'catalog':[{'id':'p','name':'Codex label','roots':['D:/one','D:/two']}]})
+        sent=[json.loads(x) for x in process.stdin.content.splitlines()]
+        self.assertEqual([x['method'] for x in sent],['initialize','initialized','project/list'])
+
+    def test_incomplete_catalog_never_guesses_root_ownership(self):
+        process=FakeProcess([{'id':1,'result':{}}]+[{'id':i,'result':{'data':[],'nextCursor':'more'}} for i in range(2,7)])
+        found={};c.ProjectCatalog._exchange(process,[],found)
+        self.assertEqual(found,{})
+
+    def test_multiple_saved_roots_merge_but_ambiguous_root_stays_unlinked(self):
+        from unittest.mock import Mock
+        catalog=Mock();catalog.projects.return_value=[{'id':'p','name':'Real project','roots':['D:/one','D:/two']}]
+        data={'projects':[{'path':'d:\\one','enabled':True,'last_captured':'2'},{'path':'D:/two','enabled':False,'last_captured':'1'}],'sessions':[]}
+        def contexts(_store,path=''):
+            return {**data,'sessions':[{'id':path,'last_captured':'1'}] if path else []}
+        with patch('tas_notes_anomalies.contexts',side_effect=contexts), patch('tas_notes_anomalies.anomaly_presence',return_value={'has_anomalies':False}):
+            result=c.navigation_contexts(None,'D:/two',catalog)
+            self.assertEqual(len(result['projects']),1)
+            self.assertEqual(result['projects'][0]['name'],'Real project')
+            self.assertEqual({x['project'] for x in result['sessions']},{'d:\\one','D:/two'})
+            catalog.projects.return_value.append({'id':'q','name':'Other','roots':['D:/two']})
+            result=c.navigation_contexts(None,'',catalog)
+            self.assertEqual(len(result['projects']),2)
+            self.assertIsNone(result['projects'][1]['name'])

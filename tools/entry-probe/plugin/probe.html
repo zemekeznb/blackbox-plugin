@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blackbox 入口验证</title>
+<style>body{font:16px system-ui;margin:32px;line-height:1.7;color:#24352e;background:#f6f8f5}main{max-width:640px;margin:auto;padding:28px;border:1px solid #d5dfd7;border-radius:16px;background:white}small{color:#52675c}button{padding:10px 18px;background:#185e42;color:white;border:0;border-radius:8px}#status{padding:14px;background:#edf4ee}</style>
+<main><small>NOTES-024 · 本地兼容性验证</small><h1>Blackbox 入口验证</h1><p>界面已加载。这是独立测试页，不读取异常记录，不调用模型。</p><p id="status" role="status">正在连接宿主…</p><button id="test" disabled>验证本地工具连接</button><p id="result"></p></main>
+<script>
+let nextId=1; const pending=new Map(); const status=document.getElementById('status');
+function request(method,params){return new Promise((resolve,reject)=>{const id=nextId++;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('timeout'));},10000);pending.set(id,{resolve,reject,timer});parent.postMessage({jsonrpc:'2.0',id,method,params},'*');});}
+addEventListener('message',event=>{if(event.source!==parent)return;const msg=event.data;if(!msg||msg.jsonrpc!=='2.0')return;if(pending.has(msg.id)){const p=pending.get(msg.id);clearTimeout(p.timer);pending.delete(msg.id);msg.error?p.reject(new Error('host error')):p.resolve(msg.result);}});
+request('ui/initialize',{appInfo:{name:'Blackbox Entry Probe',version:'0.0.1'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>{parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');status.textContent='宿主连接成功；尚未读取任何记录。';document.getElementById('test').disabled=false;}).catch(()=>{status.textContent='宿主连接未通过；不能据页面显示认定接入成功。';});
+document.getElementById('test').onclick=async()=>{const out=document.getElementById('result');try{const result=await request('tools/call',{name:'open_probe',arguments:{}});out.textContent=result.structuredContent?.probe==='NOTES-024'?'本地工具连接成功。':'返回格式未通过。';}catch{out.textContent='本地工具连接未通过。';}};
+</script></html>

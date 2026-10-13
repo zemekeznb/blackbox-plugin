@@ -13,7 +13,7 @@ from urllib.parse import urlsplit, parse_qs
 ENTRY = Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts/tas_notes.py'
 sys.path.insert(0,str(ENTRY.parent))
 from tas_notes_core import Store, NotesError
-from tas_notes_launcher import (healthy, ensure_reviewer, stop_reviewer, request_shutdown,
+from tas_notes_launcher import (probe_instance, ensure_reviewer, stop_reviewer, request_shutdown,
     resolve_state_directory, runtime_metadata, build_id, normalized_file_bytes, background)
 from open_notes import parse_options
 
@@ -61,7 +61,7 @@ class LauncherTests(unittest.TestCase):
             for value in [None,{}, {'pid':1,'url':'https://example.org/#token=secret'},
                           {'pid':1,'url':'http://localhost:80/#token='+'a'*43},
                           {'pid':1,'url':'http://127.0.0.1:99999/#token='+'a'*43}]:
-                self.assertFalse(healthy(value,'build'))
+                self.assertIsNone(probe_instance(value))
             connection.assert_not_called()
 
     def test_concurrent_open_reuses_and_stale_registry_recovers(self):
@@ -176,7 +176,7 @@ class LauncherTests(unittest.TestCase):
                     self.assertEqual(reused['url'], first['url'])
                 self.assertTrue(cli('stop')['stopped'])
                 self.assertFalse(registry.exists())
-                self.assertFalse(healthy(first, build_id()))
+                self.assertIsNone(probe_instance(first))
             finally:
                 request_shutdown(first)
 
@@ -212,7 +212,7 @@ class LauncherTests(unittest.TestCase):
                     ensure_reviewer(store)
                 self.assertEqual(len(captured), 1)
                 self.assertEqual(stop.call_count, 1)
-                self.assertFalse(healthy(captured[0], build_id()))
+                self.assertIsNone(probe_instance(captured[0]))
                 self.assertFalse((store.directory / 'review-instance.json').exists())
                 self.assertEqual(list(store.directory.glob('.review-ready-*')), [])
 

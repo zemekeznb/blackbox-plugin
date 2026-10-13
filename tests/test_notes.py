@@ -255,6 +255,9 @@ class StoreTests(unittest.TestCase):
 
     def test_separate_process_persists_unicode_and_exports_without_overwrite(self):
         event = self.event(prompt='中文用户材料')
+        from tas_notes_admission import admit
+        with patch('tas_notes_admission.lookup', return_value='allowed'):
+            admit(self.store, event)
         result = self.cli('hook', data=json.dumps(event, ensure_ascii=False).encode('utf-8'))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, b'')
@@ -277,6 +280,9 @@ class StoreTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == 'nt', 'Windows launcher')
     def test_windows_launcher_copies_raw_unicode_stdin(self):
+        from tas_notes_admission import admit
+        with patch('tas_notes_admission.lookup', return_value='allowed'):
+            admit(self.store, self.event())
         self.assertEqual(self.cli('configure-runtime').returncode, 0)
         environment = dict(os.environ, TAS_NOTES_STATE_DIR=str(self.store.directory))
         copied = self.project / '插件 scripts'

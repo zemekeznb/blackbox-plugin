@@ -148,6 +148,47 @@ def default_state():
     return Path(base) / 'TAS Notes'
 
 
+def diagnostic_requires_review(marker, last_recorded_event):
+    """Compare metadata only; an old gap cannot prove a present capture failure."""
+    if not marker:
+        return False
+    try:
+        error_time = datetime.fromisoformat(marker.get('time'))
+        event_time = datetime.fromisoformat((last_recorded_event or {}).get('captured'))
+        if not error_time.tzinfo or not event_time.tzinfo:
+            return True
+        return error_time >= event_time
+    except (TypeError, ValueError):
+        return True
+
+
+def capture_state(enabled, runtime, capacity_reached, needs_review, last_recorded_event):
+    """This is local configuration/receipt evidence, never a host health check."""
+    if not enabled:
+        return 'disabled'
+    if runtime.get('state') != 'configured':
+        return 'runtime_problem'
+    if capacity_reached:
+        return 'capacity_reached'
+    if needs_review:
+        return 'review_diagnostics'
+    return 'events_received' if last_recorded_event else 'awaiting_event'
+
+
+def print_capture_scope(directory, project, *, accepted=False):
+    print('Blackbox Plugin capture scope: enabled projects may save user prompts, ordinary tool inputs '
+          'and returns, final assistant replies, and event metadata locally; storage is not limited to errors.\n'
+          'Only host-verified persistent user sessions (including archived) are accepted; internal or '
+          'temporary sessions are excluded. Events whose session identity cannot be verified are not saved or replayed.\n'
+          'Redaction is limited and captured text may contain sensitive data. No automatic upload is enabled.\n'
+          f'Project: {Path(project).expanduser().resolve()}\n'
+          f'State directory: {directory}\n'
+          'To stop future recording, run the disable command for this exact project; existing history remains.\n'
+          + ('Scope acknowledged with --accept-capture-scope; applying this project selection.' if accepted else
+             'Nothing changed. Review this scope, then repeat enable with --accept-capture-scope to opt in.'),
+          file=sys.stderr)
+
+
 class Store:
     def __init__(self, directory, read_only=False):
         self.directory = Path(directory).expanduser().resolve()
@@ -230,6 +271,25 @@ class Store:
                        (path, int(enabled)))
         return {'project': path, 'enabled': bool(enabled)}
 
+    def manage_project(self, value):
+        """Change only a previously registered, explicitly confirmed project."""
+        if (not isinstance(value, dict) or set(value) != {'path', 'enabled', 'expected_enabled', 'accept_capture_scope'}
+                or not isinstance(value['path'], str) or len(value['path']) > 4096
+                or any(type(value[key]) is not bool for key in ('enabled', 'expected_enabled', 'accept_capture_scope'))
+                or (value['enabled'] and not value['accept_capture_scope'])):
+            raise NotesError('invalid project confirmation')
+        path = project_path(value['path'], require_exists=value['enabled'])
+        if path != value['path'] or self.directory == Path(path) or Path(path) in self.directory.parents:
+            raise NotesError('invalid project path')
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT enabled FROM projects WHERE path=?', (path,)).fetchone()
+            if row is None or bool(row['enabled']) != value['expected_enabled']:
+                raise NotesError('project state changed')
+            db.execute('UPDATE projects SET enabled=? WHERE path=?', (int(value['enabled']), path))
+            db.commit()
+        return {'project': path, 'enabled': value['enabled']}
+
     def record(self, payload):
         # Opted-out projects do not acquire a writer lock or process their bodies.
         if not isinstance(payload, dict):
@@ -255,14 +315,30 @@ class Store:
                     self.capture_failure(error, project, session)
             raise
 
-    def record_stream(self, stream):
+    def record_stream(self, stream, *, verify_session=False):
         """Bound input before decoding; never infer identity from a JSON prefix."""
+        from tas_notes_capture_probe import CaptureProbe
+        probe = CaptureProbe(self.directory)
         try:
             raw = stream.read(MAX_INPUT + 1)
             if len(raw) > MAX_INPUT:
                 raise CaptureLimit('InputTooLarge')
-            return self.record(json.loads(raw.decode('utf-8-sig')))
+            payload = json.loads(raw.decode('utf-8-sig'))
+            probe.received(payload)
+            if verify_session:
+                if not isinstance(payload, dict):
+                    raise NotesError('hook input must be an object')
+                from tas_notes_admission import admit
+                accepted, reason = admit(self, payload)
+                if not accepted:
+                    result = {'status': 'ignored', 'reason': reason}
+                    probe.outcome(result)
+                    return result
+            result = self.record(payload)
+            probe.outcome(result)
+            return result
         except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
+            probe.emit('rejected', error_type=type(error).__name__)
             if not getattr(error, '_capture_diagnostic_recorded', False):
                 self.capture_failure(error)
             raise
@@ -291,6 +367,10 @@ class Store:
                 if not allowed or not allowed['enabled']:
                     db.rollback()
                     return {'status': 'ignored', 'reason': 'project_not_enabled'}
+                from tas_notes_cleanup import deleted_replay, occupied
+                if deleted_replay(db, project, session, key):
+                    db.rollback()
+                    return {'status': 'ignored', 'reason': 'deleted_replay'}
                 # Read gap state only after earlier writers have completed. A
                 # rejected boundary publishes its marker before releasing this lock.
                 content = json.loads(body)
@@ -336,7 +416,7 @@ class Store:
                             raise Conflict('host event ID reused with different content')
                     db.rollback()
                     return {'status': 'duplicate', 'investigation': identifier}
-                if self.database.stat().st_size >= MAX_DATABASE_BYTES:
+                if occupied(db) >= MAX_DATABASE_BYTES:
                     raise CaptureLimit('DatabaseCapacityReached')
                 usage = db.execute('SELECT bytes,count FROM capture_usage WHERE investigation=?', (identifier,)).fetchone()
                 size, count = (usage['bytes'], usage['count']) if usage else (0, 0)
@@ -397,16 +477,46 @@ class Store:
         from tas_notes_launcher import runtime_metadata
         application = runtime_metadata(self)
         application['state_directory'] = application['state_dir']
-        size = self.database.stat().st_size
-        return {'status_version': 2, 'runtime': runtime_status(self.directory), 'projects': projects,
+        from tas_notes_cleanup import occupied, pending, exists
+        with self.connect() as db:
+            size = occupied(db)
+            cleanup_pending = pending(db)
+            limited_sessions = [dict(r) for r in db.execute('SELECT i.id,i.project,u.count,u.bytes FROM capture_usage u JOIN investigations i ON i.id=u.investigation WHERE u.count>=5000 OR u.bytes>=?', (MAX_SESSION_BYTES,))] if exists(db, 'capture_usage') else []
+            from tas_notes_cleanup import exists
+            last_cleanup = json.loads(db.execute('SELECT result FROM cleanup_receipts ORDER BY rowid DESC LIMIT 1').fetchone()[0]) if exists(db, 'cleanup_receipts') and db.execute('SELECT 1 FROM cleanup_receipts LIMIT 1').fetchone() else None
+        runtime = runtime_status(self.directory)
+        unknown_error = unscoped_error(self.directory)
+        capacity_reached = size >= MAX_DATABASE_BYTES
+        last_event = max((project['last_recorded_event'] for project in projects if project['last_recorded_event']),
+                         key=lambda event: event['seq'], default=None)
+        unscoped_needs_review = diagnostic_requires_review(unknown_error, last_event)
+        for project in projects:
+            needs_review = (diagnostic_requires_review(project['last_capture_error'], project['last_recorded_event'])
+                            or diagnostic_requires_review(unknown_error, project['last_recorded_event']))
+            project['capture_diagnostics_need_review'] = needs_review
+            project['capture_state'] = capture_state(project['enabled'], runtime, capacity_reached,
+                                                     needs_review, project['last_recorded_event'])
+        enabled_projects = [project for project in projects if project['enabled']]
+        active_last_event = max((project['last_recorded_event'] for project in enabled_projects if project['last_recorded_event']),
+                               key=lambda event: event['seq'], default=None)
+        needs_review = unscoped_needs_review or any(project['capture_diagnostics_need_review'] for project in enabled_projects)
+        health_state = capture_state(bool(enabled_projects), runtime, capacity_reached, needs_review, active_last_event)
+        if not enabled_projects and unscoped_needs_review:
+            health_state = 'review_diagnostics'
+        health = {'state': health_state, 'last_recorded_at': last_event['captured'] if last_event else None,
+                  'enabled_project_count': len(enabled_projects), 'diagnostics_need_review': needs_review,
+                  'unscoped_diagnostics_need_review': unscoped_needs_review, 'scope': 'local_metadata_only'}
+        return {'status_version': 2, 'runtime': runtime, 'projects': projects,
+                'capture_health': health,
                 'application': application,
                 'storage': {'database_bytes': size, 'database_limit_bytes': MAX_DATABASE_BYTES,
-                            'capacity_reached': size >= MAX_DATABASE_BYTES,
+                            'capacity_reached': capacity_reached, 'cleanup_pending': cleanup_pending,
+                            'disk_bytes': self.database.stat().st_size, 'limited_sessions': limited_sessions, 'last_cleanup': last_cleanup,
                             'session_limit_bytes': MAX_SESSION_BYTES,
                             'error_reserve_bytes': ERROR_RESERVE_BYTES},
                 'record_count': sum(p['record_count'] for p in projects), 'records': records,
                 'last_capture_error': last_error(self.directory),
-                'last_unscoped_capture_error': unscoped_error(self.directory),
+                'last_unscoped_capture_error': unknown_error,
                 'host_integration': 'not_checked', 'continuous_capture': 'unknown'}
 
     def detail(self, identifier):
@@ -419,11 +529,13 @@ class Store:
             events = [dict(r) for r in db.execute('SELECT seq,kind,content,digest,captured FROM events WHERE investigation=? ORDER BY seq', (identifier,))]
             revisions = [dict(r) for r in db.execute('SELECT * FROM revisions WHERE investigation=? ORDER BY number DESC', (identifier,))]
             summaries = [dict(r) for r in db.execute('SELECT * FROM summaries WHERE investigation=? ORDER BY rowid DESC', (identifier,))]
+            from tas_notes_cleanup import exists
+            source_removed = bool(exists(db, 'deleted_sources') and db.execute('SELECT 1 FROM deleted_sources WHERE investigation=? LIMIT 1', (identifier,)).fetchone())
             revision = revisions[0] if revisions else None
             summary = summaries[0] if summaries else None
             db.commit()
         result = dict(row)
-        result.update(events=events, revision=dict(revision) if revision else None,
+        result.update(source_removed=source_removed, events=events, revision=dict(revision) if revision else None,
                       revisions=revisions, summaries=summaries,
                       source_seq=events[-1]['seq'] if events else 0)
         first = next((e['content'] for e in events if e['kind'] == 'UserPromptSubmit'), None)
@@ -432,6 +544,8 @@ class Store:
         result['summary'] = dict(summary) if summary else None
         result['summary_stale'] = bool(summary and summary['source_seq'] != result['source_seq'])
         result['overview'] = render_draft(result)
+        if source_removed:
+            result['overview'] = '> 部分原始来源已清理；保留的历史版本可能引用已删除内容。\n\n' + result['overview']
         result['draft'] = render_summary(result['summary']) if summary and not result['summary_stale'] else result['overview']
         return result
 
@@ -439,9 +553,11 @@ class Store:
         revision_id = text(revision_id, 'revision id')
         with self.connect() as db:
             row = db.execute('SELECT * FROM revisions WHERE id=?', (revision_id,)).fetchone()
+            from tas_notes_cleanup import exists
+            removed = row and exists(db, 'deleted_sources') and db.execute('SELECT 1 FROM deleted_sources WHERE investigation=? LIMIT 1', (row['investigation'],)).fetchone()
         if not row:
             raise NotesError('reviewed revision not found')
-        return (f"# {row['title']}\n\n"
+        return (('> 部分原始来源已清理；此历史版本仍可能包含当时保存的内容。\n\n' if removed else '') + f"# {row['title']}\n\n"
                 f"> 人工保存版本 {row['number']} · {row['created']}\n"
                 f"> 记录 {row['investigation']} · 来源截至事件 {row['source_seq']}\n"
                 '> 保存和导出不等于用户验收通过；后续调查可能改变结论。\n\n'
@@ -515,8 +631,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Blackbox Plugin: local execution errors and read-only archives')
     parser.add_argument('--state-dir', type=Path)
     commands = parser.add_subparsers(dest='command', required=True)
-    for command in ('enable', 'disable'):
-        commands.add_parser(command).add_argument('project')
+    enable = commands.add_parser('enable')
+    enable.add_argument('project')
+    enable.add_argument('--accept-capture-scope', action='store_true',
+                        help='acknowledge local prompts/tool returns/final replies storage, not only errors')
+    commands.add_parser('disable').add_argument('project')
     commands.add_parser('hook')
     commands.add_parser('status')
     commands.add_parser('stop')
@@ -544,6 +663,10 @@ def main(argv=None):
             return 0
         from tas_notes_launcher import resolve_state_directory
         directory = resolve_state_directory(args.state_dir)
+        if args.command == 'enable':
+            print_capture_scope(directory, args.project, accepted=args.accept_capture_scope)
+            if not args.accept_capture_scope:
+                return 2
         if args.command == 'hook' and not (directory / 'notes.sqlite3').is_file():
             # Installation alone has no authorization and need not create a database.
             return 0
@@ -566,7 +689,7 @@ def main(argv=None):
         elif args.command in ('enable', 'disable'):
             result = store.set_project(args.project, args.command == 'enable')
         elif args.command == 'hook':
-            result = store.record_stream(sys.stdin.buffer)
+            result = store.record_stream(sys.stdin.buffer, verify_session=True)
             # Never inject captured text or additional instructions into the Agent.
             return 0
         elif args.command == 'backup':

@@ -3,6 +3,7 @@ const element = id => document.getElementById(id);
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
 element('anomalies-home').href = './#' + new URLSearchParams({token}).toString();
 let selected = null, selectedRevision = null, openSequence = 0, listSequence = 0, captureSequence = 0;
+let exportSequence = 0, exportSnapshot = null, recordLoading = false;
 function status(message) { element('status').textContent = message; }
 function dateLabel(stamp) {
   const date = stamp ? new Date(stamp) : null;
@@ -29,10 +30,10 @@ async function captureStatus() {
     const projects = element('capture-projects'); projects.replaceChildren();
     for (const project of value.projects || []) {
       block(projects, 'p', `${project.enabled ? '已启用' : '已停用'} · ${project.path} · ${project.last_recorded_event ? '最近落盘 '+dateLabel(project.last_recorded_event.captured) : '尚未收到记录'}`);
-      if(project.last_capture_error) block(projects, 'p', `该项目的历史采集缺口：${project.last_capture_error.code} · ${dateLabel(project.last_capture_error.time)}。标记保留，不代表当前仍然故障。`).className='notice';
+      if(project.last_capture_error) block(projects, 'p', `该项目的历史采集缺口：${project.last_capture_error.code} · ${dateLabel(project.last_capture_error.time)}。`).className='notice';
     }
     const failure = value.last_capture_error;
-    element('capture-error').textContent = failure ? `历史采集缺口标记：${failure.code} · ${dateLabel(failure.time)}。不代表当前或特定项目仍然故障。` : '没有已保存的失败标记；不代表采集没有缺口。';
+    element('capture-error').textContent = failure ? `历史采集缺口标记：${failure.code} · ${dateLabel(failure.time)}。` : '暂无失败记录。';
   } catch (error) {
     if (sequence === captureSequence) element('capture-status').textContent = `状态读取失败：${error.message}`;
   }
@@ -56,11 +57,12 @@ async function list() {
     : '暂无记录。安装插件本身不会授权采集。';
 }
 function selectRevision(id) {
+  cancelExportPreview();
   if (!selected) return;
   selectedRevision = selected.revisions.find(revision => revision.id === id) || null;
-  element('export').disabled = !selectedRevision;
+  element('export').disabled = recordLoading || !selectedRevision;
   if (selectedRevision) {
-    element('reading-state').textContent = `历史人工版本 ${selectedRevision.number} · ${dateLabel(selectedRevision.created)} · 来源截至 #${selectedRevision.source_seq}。保存并不等于验收通过；新增事件不会改写这个版本。`;
+    element('reading-state').textContent = (selected.source_removed?'部分原始来源已清理。 ':'') + `历史人工版本 ${selectedRevision.number} · ${dateLabel(selectedRevision.created)} · 来源截至 #${selectedRevision.source_seq}。保存并不等于验收通过；新增事件不会改写这个版本。`;
     element('record-heading').textContent = selectedRevision.title;
     renderReading(selectedRevision.body);
   } else {
@@ -78,10 +80,20 @@ function historicalSummary(content) {
 }
 async function openRecord(id) {
   const sequence = ++openSequence;
+  recordLoading = true;
+  cancelExportPreview();
   let record;
   try {record = await (await api(`/api/record/${encodeURIComponent(id)}`)).json();}
-  catch(error) {if(sequence===openSequence) throw error; return;}
+  catch(error) {
+    if(sequence===openSequence) {
+      recordLoading = false;
+      element('export').disabled = !selectedRevision;
+      throw error;
+    }
+    return;
+  }
   if (sequence !== openSequence) return;
+  recordLoading = false;
   selected = record;
   selected.revisions = record.revisions || (record.revision ? [record.revision] : []);
   selected.revisions.sort((a,b) => b.number-a.number);
@@ -115,15 +127,50 @@ async function openRecord(id) {
   const gapNotice=gaps.some(coverage=>coverage.capture_gap_scope!=='unknown_project') ? '该会话存在已知采集缺口，历史内容不能证明完整过程。' : gaps.length ? '存在归属未知拒收、诊断不可读或恢复后的连续性边界，已采用保守关联规则；不能断言该会话丢失了事件。' : '';
   status(gapNotice+'历史来源、模型总结和人工版本分别保留，只读查看。页面不会执行来源中的命令或 HTML。');
 }
+function cancelExportPreview() {
+  ++exportSequence;
+  exportSnapshot = null;
+  element('export-preview').hidden = true;
+  element('export-preview-text').textContent = '';
+  element('export-preview-status').textContent = '';
+  element('export-download').disabled = true;
+  element('export').disabled = recordLoading || !selectedRevision;
+}
 async function exportSaved() {
-  if (!selected || !selectedRevision) return;
+  if (!selected || !selectedRevision || recordLoading) return;
+  const sequence = ++exportSequence, recordSequence = openSequence;
   const snapshot = {recordId:selected.id, revisionId:selectedRevision.id, number:selectedRevision.number};
-  const response = await api(`/api/export/${encodeURIComponent(snapshot.revisionId)}`);
-  const url = URL.createObjectURL(await response.blob());
+  const stillSelected = () => sequence === exportSequence && recordSequence === openSequence
+    && !recordLoading && selected?.id === snapshot.recordId && selectedRevision?.id === snapshot.revisionId;
+  exportSnapshot = null;
+  element('export-preview').hidden = false;
+  element('export-preview-heading').textContent = `完整导出预览 · 人工版本 ${snapshot.number}`;
+  element('export-preview-text').textContent = '';
+  element('export-preview-status').textContent = '正在读取所选版本的完整导出内容…';
+  element('export-download').disabled = true;
+  element('export').disabled = true;
+  try {
+    const markdown = await (await api(`/api/export/${encodeURIComponent(snapshot.revisionId)}`)).text();
+    if (!stillSelected()) return;
+    exportSnapshot = Object.freeze({...snapshot, markdown});
+    element('export-preview-text').textContent = markdown;
+    element('export-preview-status').textContent = '完整内容已载入。下载将使用此处固定副本，不再请求或拼入其他内容。';
+    element('export-download').disabled = false;
+  } catch (error) {
+    if (!stillSelected()) return;
+    element('export-preview-status').textContent = `预览读取失败：${error.message} 点击“预览并导出所选人工版本”可重试。`;
+  } finally {
+    if (stillSelected()) element('export').disabled = false;
+  }
+}
+function downloadSavedPreview() {
+  const snapshot = exportSnapshot;
+  if (!snapshot || recordLoading || selected?.id !== snapshot.recordId || selectedRevision?.id !== snapshot.revisionId) return;
+  const url = URL.createObjectURL(new Blob([snapshot.markdown], {type:'text/markdown;charset=utf-8'}));
   const link = document.createElement('a'); link.href = url;
   link.download = `investigation-${snapshot.recordId}-v${snapshot.number}.md`;
   link.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
-  status(`已请求下载历史人工版本 ${snapshot.number}。新增事件不会加入该版本，没有上传。`);
+  status(`已请求下载预览中的历史人工版本 ${snapshot.number}。内容与预览一致，没有上传。`);
 }
 // Deliberately small Markdown subset. All source content stays in text nodes.
 // No raw HTML, links, images or embedded resources are executed or requested.
@@ -187,6 +234,8 @@ function renderReading(body) {
   if (code) code.textContent = codeLines.join('\n');
 }
 element('revision').addEventListener('change', () => selectRevision(element('revision').value));
+element('export-download').addEventListener('click', downloadSavedPreview);
+element('export-close').addEventListener('click', cancelExportPreview);
 for (const [id,action] of [['search',list],['refresh',list],['export',exportSaved]]) {
   element(id).addEventListener('click', () => action().catch(e => status(e.message)));
 }
@@ -196,7 +245,7 @@ if (location.protocol === 'file:') {
   element('file-preview').hidden = false;
   element('capture-status').textContent = '文件预览模式，未连接本地记录服务。';
   element('list-status').textContent = '请使用 Blackbox Plugin 启动入口读取记录。';
-  for (const id of ['query','search','refresh','refresh-capture','revision','export']) element(id).disabled = true;
+  for (const id of ['query','search','refresh','refresh-capture','revision','export','export-download']) element(id).disabled = true;
   status('页面样式可预览；记录读取和下载需要本地服务。');
 } else {
   list().catch(e=>status(e.message)); captureStatus();

@@ -71,9 +71,10 @@ class ReaderSelection:
 def make_server(store, token=None):
     token = token or secrets.token_urlsafe(32)
     from tas_notes_launcher import runtime_metadata
-    from tas_notes_codex import SessionNames
+    from tas_notes_codex import SessionMetadata, ProjectCatalog, session_labels, navigation_contexts
     runtime = runtime_metadata(store)
-    names = SessionNames()
+    names = SessionMetadata()
+    projects = ProjectCatalog()
     selection = ReaderSelection(store)
 
     class Handler(BaseHTTPRequestHandler):
@@ -165,10 +166,16 @@ def make_server(store, token=None):
                     query = parse_qs(request.query)
                     self.send(200, listing(store, **{key: query.get(key, [''])[0]
                         for key in ('project', 'tool', 'start', 'end', 'before', 'through',
-                                    'project_path', 'investigation')}))
+                                    'project_path', 'investigation', 'anomaly_type')}))
+                elif request.path == '/api/anomaly-types':
+                    from tas_notes_anomalies import anomaly_types
+                    query = parse_qs(request.query)
+                    self.send(200, anomaly_types(store, query.get('investigation', [''])[0], query.get('through', [None])[0]))
+                elif request.path == '/api/session-management':
+                    from tas_notes_sessions import inspect_session
+                    self.send(200, inspect_session(store, parse_qs(request.query).get('investigation', [''])[0]))
                 elif request.path == '/api/anomaly-contexts':
-                    from tas_notes_anomalies import contexts
-                    self.send(200, contexts(store, parse_qs(request.query).get('project_path', [''])[0]))
+                    self.send(200, navigation_contexts(store, parse_qs(request.query).get('project_path', [''])[0], projects))
                 elif request.path == '/api/session-names':
                     from tas_notes_anomalies import saved_sessions
                     try:
@@ -178,7 +185,7 @@ def make_server(store, token=None):
                     if set(query) != {'investigation'}:
                         raise NotesError('invalid session names request')
                     saved = saved_sessions(store, query['investigation'])
-                    self.send(200, {'names': names.names({key: value['session'] for key, value in saved.items()})})
+                    self.send(200, session_labels(names, {key: value['session'] for key, value in saved.items()}))
                 elif request.path == '/api/reader-selection':
                     self.send(200, selection.get())
                 elif request.path.startswith('/api/anomaly/') or request.path.startswith('/api/anomaly-export/'):
@@ -209,7 +216,7 @@ def make_server(store, token=None):
             if self.path == '/api/revisions':
                 self.send(410, {'error': 'history_is_read_only'})
                 return
-            if self.path == '/api/reader-selection':
+            if self.path in ('/api/reader-selection', '/api/session-management', '/api/project-management', '/api/cleanup'):
                 try:
                     if (self.headers.get('Transfer-Encoding')
                             or len(self.headers.get_all('Content-Length', [])) != 1
@@ -219,7 +226,7 @@ def make_server(store, token=None):
                         length = int(self.headers['Content-Length'])
                     except ValueError:
                         raise NotesError('invalid reader selection length') from None
-                    if not 0 < length <= 1024:
+                    if not 0 < length <= (131072 if self.path == '/api/cleanup' else 8192 if self.path == '/api/project-management' else 1024):
                         raise NotesError('invalid reader selection length')
                     body = self.rfile.read(length)
                     self.body_consumed = True
@@ -227,7 +234,16 @@ def make_server(store, token=None):
                         value = json.loads(body)
                     except (ValueError, UnicodeError):
                         raise NotesError('invalid reader selection JSON') from None
-                    self.send(200, selection.set(value))
+                    if self.path == '/api/cleanup':
+                        from tas_notes_cleanup import dispatch
+                        self.send(200, dispatch(store, value))
+                    elif self.path == '/api/project-management':
+                        self.send(200, store.manage_project(value))
+                    elif self.path == '/api/session-management':
+                        from tas_notes_sessions import manage_session
+                        self.send(200, manage_session(store, value))
+                    else:
+                        self.send(200, selection.set(value))
                 except NotesError:
                     self.send(400, {'error': 'invalid_request'})
                 except (sqlite3.Error, OSError):
@@ -251,6 +267,7 @@ def make_server(store, token=None):
                 super().server_close()
             finally:
                 names.close()
+                projects.close()
 
     server = ReadingServer(('127.0.0.1', 0), Handler)
     server.daemon_threads = True
