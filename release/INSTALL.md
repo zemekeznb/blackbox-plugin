@@ -1,13 +1,13 @@
 # 安装与首次接入
 
-当前公开试用版 **0.4.0-alpha.6.44**，本轮仅面向 **Windows 版 Codex 桌面端**。先安装并打开 Codex，确保宿主能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git、GitHub 登录或单独安装 Codex CLI；CLI 使用支持留待后续补充。
+当前公开试用版 **0.4.0-alpha.6.45**，本轮仅面向 **Windows 版 Codex 桌面端**。先安装并打开 Codex，确保宿主能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集，CLI 使用支持留待后续补充。
 
 ## 1. 交给 Codex 安装
 
 在 **Codex 桌面会话**中复制发送：
 
 ```text
-请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 ```
 
 Codex 会读取固定版本的执行说明、检查依赖、下载并校验插件包，完成安装与本地初始化，再打开 Blackbox。无需自行操作终端或下载解压。安装与页面打开的结果分别报告；如果缺少依赖或遇到阻断，按 Codex 给出的具体步骤处理。
@@ -53,6 +53,6 @@ Codex 会读取固定版本的执行说明、检查依赖、下载并校验插�
 
 ## 已验证到哪一步
 
-.44 已有公开下载校验、缺少 Codex/Git PATH 条件下的隔离安装、重复安装和初始化证据。实际用户的桌面打开、Hook 信任、重载与真实记录到达须分别验收；干净电脑、最低 Codex 版本及 API Key 登录模式尚未完成专项验收。最新证据见[当前状态](../docs/current-status.md)。
+.45 收紧会话准入，防止安装辅助终端产生额外记录；升级后旧身份缓存会重新核对，已有历史不自动删除。安装链路沿用已有公开下载与隔离安装验证的流程。离线检查、实际用户的桌面打开、Hook 信任、重载与真实记录到达分别验收；干净电脑、最低 Codex 版本及 API Key 登录模式尚未完成专项验收。逐版本证据见[当前状态](../docs/current-status.md)。
 
 [Codex 执行说明](INSTALL-CODEX.md)供安装会话读取；[开发与验证](../docs/DEVELOPMENT.md)供维护者使用。

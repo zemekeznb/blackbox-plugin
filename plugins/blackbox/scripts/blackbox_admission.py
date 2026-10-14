@@ -1,4 +1,4 @@
-"""Host-verified interactive session admission. Never persists unknown event bodies."""
+"""Host-verified desktop session admission. Never persists unknown event bodies."""
 import hashlib
 import time
 
@@ -8,13 +8,14 @@ from blackbox_core import canonical, project_path, session_identity, diagnostic
 MAX_ENTRIES = 1024
 VALID_SECONDS = 86400
 RETRY_SECONDS = 5
+CACHE_POLICY = 'desktop-v1'
 
 
 def classify(thread):
     source = thread.get('source')
-    if thread.get('ephemeral') is True or source == 'exec' or (isinstance(source, dict) and 'subAgent' in source):
+    if thread.get('ephemeral') is True or source in ('cli', 'exec') or (isinstance(source, dict) and 'subAgent' in source):
         return 'excluded'
-    if thread.get('ephemeral') is False and isinstance(source, str) and source in ('cli', 'vscode', 'appServer'):
+    if thread.get('ephemeral') is False and isinstance(source, str) and source in ('vscode', 'appServer'):
         return 'allowed'
     return 'unconfirmed'
 
@@ -48,7 +49,10 @@ def admit(store, payload):
         if not authorized or not authorized[0]:
             return False, 'project_not_enabled'
         session = session_identity(payload)
-        key = hashlib.sha256(canonical([project, session]).encode()).hexdigest()
+        # Old allowed rows may identify CLI sessions, so only this policy's
+        # verification can authorize capture or survive a transport outage.
+        key = hashlib.sha256(canonical([CACHE_POLICY, project, session]).encode()).hexdigest()
+        legacy_key = hashlib.sha256(canonical([project, session]).encode()).hexdigest()
         exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='session_admission'").fetchone()
         row = db.execute('SELECT state,checked,skipped FROM session_admission WHERE key=?', (key,)).fetchone() if exists else None
     if row and 0 <= stamp-row['checked'] < (VALID_SECONDS if row['state'] in ('allowed', 'excluded') else RETRY_SECONDS):
@@ -67,10 +71,13 @@ def admit(store, payload):
         if prior and prior['state'] == 'allowed' and prior['checked'] >= stamp:
             db.rollback()
             return True, 'session_verified_concurrently'
-        if state == 'allowed' and prior and prior['skipped']:
+        legacy = db.execute('SELECT skipped FROM session_admission WHERE key=?', (legacy_key,)).fetchone()
+        # Migrate continuity evidence, never the old admission decision.
+        if state == 'allowed' and ((prior and prior['skipped']) or (legacy and legacy['skipped'])):
             diagnostic(store.directory, 'SessionIdentityUnconfirmed', project, session)
         db.execute('INSERT INTO session_admission VALUES (?,?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,checked=excluded.checked,skipped=excluded.skipped',
                    (key, state, stamp, int(state != 'allowed')))
+        db.execute('DELETE FROM session_admission WHERE key=?', (legacy_key,))
         db.execute('DELETE FROM session_admission WHERE key IN (SELECT key FROM session_admission ORDER BY checked DESC,key LIMIT -1 OFFSET ?)', (MAX_ENTRIES,))
         db.commit()
     return state == 'allowed', 'session_' + state

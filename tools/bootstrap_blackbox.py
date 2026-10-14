@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-VERSION = '0.4.0-alpha.6.44'
+VERSION = '0.4.0-alpha.6.45'
 REPOSITORY = 'https://github.com/zemekeznb/blackbox-plugin'
 MAX_BYTES = 32 * 1024 * 1024
 

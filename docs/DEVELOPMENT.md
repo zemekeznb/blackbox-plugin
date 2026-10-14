@@ -9,7 +9,7 @@ python -m unittest discover -s tests -p 'test_*.py'
 $bbTests = Get-ChildItem tests -Filter 'test_*.cjs' | ForEach-Object FullName
 node --test @bbTests
 python tools/build_alpha.py
-python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.44-candidate.zip
+python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.45-candidate.zip
 ```
 
 候选构建使用文件白名单、逐文件 SHA256 和有限敏感模式检查；不包含本地数据库和 `.local`。包内安装说明为 `release/INSTALL.md`。校验工具核对摘要并运行隔离阅读器检查，不安装插件、不启用真实项目。
@@ -28,7 +28,7 @@ python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.44-can
 
 维护者先通过测试，在取得发布授权后提交代码并创建固定标签，从干净提交构建候选，将 ZIP/摘要/清单上传到同一版本 Release。引导工具只接受对应版本载荷；交付前应匿名验证提示词所指执行说明、公开引导文件与附件均可获取，并在移除 Codex/Git PATH 的隔离环境中验证引导工具的安装与初始化。最终还需从 README 提示词开始，在真实桌面环境验收页面打开与项目接入。不要移动旧标签或覆盖旧附件来伪装新版本。公开不等于开源许可，后续版本仍需授权发布。
 
-NOTES-138 收敛为桌面端单一对话入口，继续复用已发布 .44，不修改安装工具或载荷，也不提升产品版本。固定标签中的旧文档保留原样；当前操作入口以主分支 README 和安装指南为准。文档候选仅用于本地检查，不覆盖线上 .44。
+NOTES-138 收敛为桌面端单一对话入口；NOTES-140 在此基础上修补 CLI 准入与旧身份缓存，并获用户授权发布新的 .45 Alpha 安装包。固定标签中的旧文档和附件保留原样，当前操作入口以主分支 README 和安装指南为准。不因 Alpha 上传而将构建清单中的许可证待定或真实宿主未验收标记改成已通过。
 
 以下旧 Git 路径集成工具仍供维护者检查宿主能力，不是客户安装入口。它在临时 CODEX_HOME 中执行真实 Codex CLI 获取/安装和缓存内首次设置，不调用模型、不改用户真实安装或信任。输出路径须为新文件：
 

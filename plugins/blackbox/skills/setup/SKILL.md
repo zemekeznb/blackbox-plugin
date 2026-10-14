@@ -28,7 +28,7 @@ Do not use a source checkout or guess another installed version.
 5. Explain: records stay on this computer by default; recording stores authorized visible
    tool inputs/results, which can contain project content or secrets; the reader shows a
    narrower set of recognizable execution errors. No anomaly is not proof of no failures.
-   Current capture accepts only confirmed persistent user sessions in opted-in projects.
+   Current capture accepts only confirmed persistent desktop sessions in opted-in projects; terminal CLI sessions, including auxiliary installation terminals, are excluded. Existing history is not automatically deleted.
 6. If the user wants recording, use the bundled `../blackbox-review/SKILL.md` project opt-in
    workflow. Ask for an explicit project and scope acceptance if absent. Never enable all
    projects, generate a failure, or read host conversation bodies just to finish setup.

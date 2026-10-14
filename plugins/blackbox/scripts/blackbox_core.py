@@ -173,8 +173,9 @@ def capture_state(enabled, runtime, capacity_reached, needs_review, last_recorde
 def print_capture_scope(directory, project, *, accepted=False):
     print('Blackbox Plugin capture scope: enabled projects may save user prompts, ordinary tool inputs '
           'and returns, final assistant replies, and event metadata locally; storage is not limited to errors.\n'
-          'Only host-verified persistent user sessions (including archived) are accepted; internal or '
-          'temporary sessions are excluded. Events whose session identity cannot be verified are not saved or replayed.\n'
+          'Only host-verified persistent desktop sessions (including archived or unnamed) are accepted; '
+          'terminal CLI, internal and temporary sessions are excluded. Events whose session identity '
+          'cannot be verified are not saved or replayed.\n'
           'Redaction is limited and captured text may contain sensitive data. No automatic upload is enabled.\n'
           f'Project: {Path(project).expanduser().resolve()}\n'
           f'State directory: {directory}\n'

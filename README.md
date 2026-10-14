@@ -8,12 +8,12 @@
 
 ## 交给 Codex 安装
 
-当前公开试用版 **0.4.0-alpha.6.44**。准备好 **Windows、Codex 桌面版、可在 Codex 中通过 `python` 调用的 Python 3.11+**，以及能够访问 GitHub 的网络。无需 Git、GitHub 登录或单独安装 Codex CLI。
+当前公开试用版 **0.4.0-alpha.6.45**。准备好 **Windows、Codex 桌面版、可在 Codex 中通过 `python` 调用的 Python 3.11+**，以及能够访问 GitHub 的网络。无需 Git、GitHub 登录或单独安装 Codex CLI。
 
 打开 **Codex 桌面版**，在会话中复制发送：
 
 ```text
-请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 ```
 
 Codex 会检查依赖、下载并校验插件、完成安装与初始化，然后打开 Blackbox。安装不会自动启用项目。若提示插件尚未加载，按提示新开会话；确需重载时，保存工作并完整退出重开 Codex。详细步骤与排查见[安装指南](release/INSTALL.md)。
@@ -50,7 +50,7 @@ Codex 会检查依赖、下载并校验插件、完成安装与初始化，然�
 
 - 默认本地保存，不自动上传，不需要 Blackbox 账号，也不自动调用额外模型。
 - 保存范围包含获授权的可见输入、回复、工具调用及返回，**不只异常**。有限脱敏不能保证去掉所有敏感信息。
-- 本轮仅面向 **Windows 版 Codex 桌面端**；Codex CLI 的使用支持与完整验收留待后续补充。
+- 本轮仅面向 **Windows 版 Codex 桌面端**；不采集终端 CLI 会话，包括安装时辅助打开的终端会话。CLI 支持留待后续补充。
 - 宿主未投递的内容无法补回；“暂无异常”不等于执行没有失败，也不判断根因或责任。
 - 关闭页面不会停用采集；更新和普通卸载会保留已有数据。操作说明见[使用与隐私](release/ALPHA-GUIDE.md)。
 
