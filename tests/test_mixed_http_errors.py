@@ -2,7 +2,7 @@
 import unittest
 from test_curl_errors import CMD, event
 from test_transport_errors import CASES, CERT_HELP
-import tas_notes_anomalies as a
+import blackbox_anomalies as a
 
 PARTIAL = 'curl: (18) end of response with 100 bytes missing'
 TIMEOUT = 'curl: (28) Operation timed out after 300 milliseconds with 0 bytes received'

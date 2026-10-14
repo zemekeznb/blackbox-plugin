@@ -13,9 +13,9 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-import tas_notes_anomalies as a
+sys.path.insert(0, str(ROOT / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
+import blackbox_anomalies as a
 
 CASES = [
     ('dense-1k', 1000, 1, 256, True, False),

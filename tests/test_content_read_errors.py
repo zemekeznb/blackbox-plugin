@@ -3,8 +3,8 @@ import unittest
 from test_curl_errors import event
 from test_anomalies import TRACE, PS
 from test_shell_errors import PS as READ_ERROR
-import tas_notes_anomalies as a
-from tas_notes_shell_errors import literal_content_read
+import blackbox_anomalies as a
+from blackbox_shell_errors import literal_content_read
 
 
 class ContentReadErrors(unittest.TestCase):

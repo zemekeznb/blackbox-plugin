@@ -10,27 +10,35 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import Mock, patch
 from urllib.parse import urlsplit, parse_qs
 
-ENTRY = Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts/tas_notes.py'
+ENTRY = Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts/blackbox.py'
 sys.path.insert(0,str(ENTRY.parent))
-from tas_notes_core import Store, NotesError
-from tas_notes_launcher import (probe_instance, ensure_reviewer, stop_reviewer, request_shutdown,
+from blackbox_core import Store, NotesError
+from blackbox_launcher import (probe_instance, ensure_reviewer, stop_reviewer, request_shutdown,
     resolve_state_directory, runtime_metadata, build_id, normalized_file_bytes, background)
 from open_notes import parse_options
 
 class LauncherTests(unittest.TestCase):
+    def test_legacy_health_service_is_still_recognized(self):
+        response=Mock(status=200)
+        response.read.return_value=json.dumps({'service':'tas-notes-review','protocol':1,'pid':123,'build':'a'*64}).encode()
+        connection=Mock()
+        connection.getresponse.return_value=response
+        with patch('blackbox_launcher.http.client.HTTPConnection',return_value=connection):
+            self.assertEqual(probe_instance({'pid':123,'url':'http://127.0.0.1:12345/#token='+'a'*43})['service'],'tas-notes-review')
+
     def test_existing_database_resolves_file_overlay_before_directory(self):
         with tempfile.TemporaryDirectory(prefix='notes-overlay-test-') as root:
             logical, physical = Path(root) / 'logical', Path(root) / 'physical'
             logical.mkdir(); physical.mkdir()
             (logical / 'notes.sqlite3').write_bytes(b'placeholder')
-            with patch('tas_notes_launcher.physical_file_path', return_value=str(physical / 'notes.sqlite3')) as file_path, \
-                    patch('tas_notes_launcher.physical_directory_path', return_value=str(logical)) as directory_path:
+            with patch('blackbox_launcher.physical_file_path', return_value=str(physical / 'notes.sqlite3')) as file_path, \
+                    patch('blackbox_launcher.physical_directory_path', return_value=str(logical)) as directory_path:
                 self.assertEqual(resolve_state_directory(logical), physical)
                 file_path.assert_called_once_with(logical / 'notes.sqlite3')
                 directory_path.assert_not_called()
             # A new explicit state still uses its own directory, never another DB.
             (logical / 'notes.sqlite3').unlink()
-            with patch('tas_notes_launcher.physical_file_path') as file_path:
+            with patch('blackbox_launcher.physical_file_path') as file_path:
                 self.assertEqual(resolve_state_directory(logical), logical)
                 file_path.assert_not_called()
 
@@ -57,7 +65,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertTrue(request_shutdown(value)['stopped'])
 
     def test_invalid_registry_never_contacts_remote(self):
-        with patch('tas_notes_launcher.http.client.HTTPConnection') as connection:
+        with patch('blackbox_launcher.http.client.HTTPConnection') as connection:
             for value in [None,{}, {'pid':1,'url':'https://example.org/#token=secret'},
                           {'pid':1,'url':'http://localhost:80/#token='+'a'*43},
                           {'pid':1,'url':'http://127.0.0.1:99999/#token='+'a'*43}]:
@@ -95,12 +103,12 @@ class LauncherTests(unittest.TestCase):
             base = Path(root)
             explicit, override = base / 'explicit', base / 'custom'
             explicit.mkdir(); override.mkdir()
-            with patch.dict(os.environ, {'TAS_NOTES_STATE_DIR': str(override), 'LOCALAPPDATA': str(base)}):
+            with patch.dict(os.environ, {'BLACKBOX_STATE_DIR': str(override), 'LOCALAPPDATA': str(base)}):
                 self.assertEqual(resolve_state_directory(), resolve_state_directory(override))
                 self.assertEqual(parse_options([]).state_dir, resolve_state_directory(override))
                 self.assertEqual(parse_options(['--state-dir', str(explicit)]).state_dir,
                                  resolve_state_directory(explicit))
-                self.assertFalse((base / 'TAS Notes').exists())
+                self.assertFalse((base / 'Blackbox').exists())
 
     def test_build_metadata_and_newline_normalization(self):
         with tempfile.TemporaryDirectory(prefix='notes-build-test-') as root:
@@ -128,8 +136,8 @@ class LauncherTests(unittest.TestCase):
             saved = {'pid': 1234, 'url': 'http://127.0.0.1:8080/#token=' + 'a' * 43}
             (store.directory / 'review-instance.json').write_text(json.dumps(saved))
             metadata = dict(runtime_metadata(store), pid=1234, build='0' * 64)
-            with patch('tas_notes_launcher.probe_instance', return_value=metadata), \
-                    patch('tas_notes_launcher.background') as spawn:
+            with patch('blackbox_launcher.probe_instance', return_value=metadata), \
+                    patch('blackbox_launcher.background') as spawn:
                 with self.assertRaises(NotesError) as raised:
                     ensure_reviewer(store)
                 self.assertEqual(raised.exception.public_code, 'reviewer_build_changed')
@@ -142,19 +150,19 @@ class LauncherTests(unittest.TestCase):
             saved = {'pid': 1234, 'url': 'http://127.0.0.1:8080/#token=' + 'a' * 43}
             (store.directory / 'review-instance.json').write_text(json.dumps(saved))
             metadata = dict(runtime_metadata(store), pid=1234)
-            with patch('tas_notes_launcher.probe_instance', side_effect=[None, metadata]), \
-                    patch('tas_notes_launcher.background') as spawn:
+            with patch('blackbox_launcher.probe_instance', side_effect=[None, metadata]), \
+                    patch('blackbox_launcher.background') as spawn:
                 self.assertTrue(ensure_reviewer(store)['reused'])
                 spawn.assert_not_called()
 
     def test_shutdown_refuses_unverified_and_unsupported_services(self):
         saved = {'pid': 1234, 'url': 'http://127.0.0.1:8080/#token=' + 'a' * 43}
-        with patch('tas_notes_launcher.probe_instance', return_value=None), \
-                patch('tas_notes_launcher.http.client.HTTPConnection') as connection:
+        with patch('blackbox_launcher.probe_instance', return_value=None), \
+                patch('blackbox_launcher.http.client.HTTPConnection') as connection:
             self.assertEqual(request_shutdown(saved)['reason'], 'not_running')
             connection.assert_not_called()
-        with patch('tas_notes_launcher.probe_instance', return_value={'build': '0' * 64}), \
-                patch('tas_notes_launcher.http.client.HTTPConnection') as connection:
+        with patch('blackbox_launcher.probe_instance', return_value={'build': '0' * 64}), \
+                patch('blackbox_launcher.http.client.HTTPConnection') as connection:
             self.assertEqual(request_shutdown(saved)['reason'], 'shutdown_not_supported')
             connection.assert_not_called()
 
@@ -182,9 +190,9 @@ class LauncherTests(unittest.TestCase):
 
     def test_authentication_failure_and_state_mismatch_never_shutdown(self):
         saved = {'pid': 1234, 'url': 'http://127.0.0.1:8080/#token=' + 'a' * 43}
-        metadata = {'service': 'tas-notes-review', 'protocol': 1, 'pid': 1234,
+        metadata = {'service': 'blackbox-review', 'protocol': 1, 'pid': 1234,
                     'build': '0' * 64, 'state_dir': 'another-state', 'capabilities': ['shutdown']}
-        with patch('tas_notes_launcher.http.client.HTTPConnection') as constructor:
+        with patch('blackbox_launcher.http.client.HTTPConnection') as constructor:
             connection = constructor.return_value
             response = connection.getresponse.return_value
             response.status = 401
@@ -206,8 +214,8 @@ class LauncherTests(unittest.TestCase):
             def failed_publish(registry, value):
                 captured.append(value)
                 raise OSError('controlled publication failure')
-            with patch('tas_notes_launcher.write_registry', side_effect=failed_publish), \
-                    patch('tas_notes_launcher.request_shutdown', wraps=request_shutdown) as stop:
+            with patch('blackbox_launcher.write_registry', side_effect=failed_publish), \
+                    patch('blackbox_launcher.request_shutdown', wraps=request_shutdown) as stop:
                 with self.assertRaises(OSError):
                     ensure_reviewer(store)
                 self.assertEqual(len(captured), 1)
@@ -226,8 +234,8 @@ class LauncherTests(unittest.TestCase):
                 Path(args[-1]).write_text(json.dumps({'pid': child.pid,
                     'url': 'http://127.0.0.1:8080/#token=' + 'a' * 43}))
                 return child
-            with patch('tas_notes_launcher.subprocess.Popen', side_effect=launch), \
-                    patch('tas_notes_launcher.probe_instance', return_value=None):
+            with patch('blackbox_launcher.subprocess.Popen', side_effect=launch), \
+                    patch('blackbox_launcher.probe_instance', return_value=None):
                 with self.assertRaises(NotesError):
                     background(store)
             child.terminate.assert_called_once()

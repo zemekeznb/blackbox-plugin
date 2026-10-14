@@ -2,8 +2,8 @@
 import hashlib, json, os, sys
 from pathlib import Path
 from verify_live_codex import Rpc
-from tas_notes_launcher import build_id
-from tas_notes_mcp import URI, RESOURCE_URIS, resource_html
+from blackbox_launcher import build_id
+from blackbox_mcp import URI, RESOURCE_URIS, resource_html
 rpc=Rpc(dict(os.environ),enable_hooks=False)
 try:
     rpc.request('initialize',{'clientInfo':{'name':'blackbox-reader-check','version':'1'},'capabilities':{'experimentalApi':True}})
@@ -22,7 +22,7 @@ try:
     # Hook inventory contains commands/paths only, never recording bodies.
     def matching(value):
         if isinstance(value,dict):
-            if 'command' in value and 'tas-notes' in str(value.get('command')): yield value
+            if 'command' in value and 'blackbox' in str(value.get('command')): yield value
             else:
                 for child in value.values(): yield from matching(child)
         elif isinstance(value,list):

@@ -1,16 +1,18 @@
 # Blackbox Plugin — 本地 Alpha 候选包
 
+2026-10-13 更新：安装请先读 [当前完整安装说明](INSTALL.md)，包括图形首次设置、本地脚本和等价逐条命令。默认 install.ps1 现已登记并核验插件；下文旧运行配置流程用 `-RuntimeOnly` 保留。最终干净电脑与真实宿主验收仍待完成。
+
 本文件为 2026-10-11 起的 Alpha 实现新写，内容以候选代码和实际测试为准。
 
 ## 发布状态与许可
 
-此包仅供本地准备和验证，尚未公开发布。用户选择暂不授予开源许可；未提供开源许可证，不应公开分发或宣称获得开源授权。版本以 plugins/tas-notes/.codex-plugin/plugin.json 为唯一来源。候选包清单记录文件摘要、来源提交和工作树状态；工作树有改动时不等同于可从该提交复现。
+此包仅供本地准备和验证，尚未公开发布。用户选择暂不授予开源许可；未提供开源许可证，不应公开分发或宣称获得开源授权。版本以 plugins/blackbox/.codex-plugin/plugin.json 为唯一来源。候选包清单记录文件摘要、来源提交和工作树状态；工作树有改动时不等同于可从该提交复现。
 
 ## 功能与边界
 
 在 Windows 上，为明确启用的项目保存 Codex 送达的本地事件，回看可识别的执行错误，导出固定范围的 Markdown。安装、项目启用、曾收到事件、真实宿主验证是不同状态。没有异常记录不表示没有失败；宿主没有投递的事件无法补记。不会自动上传、发送记录、调用额外模型或启用其他项目。
 
-当前保存范围包含普通输入、工具调用和返回、最终回复等，不仅是错误。只做有限脱敏，正文仍可能含密码、密钥及业务内容。默认目录为 %LOCALAPPDATA%\TAS Notes；技术键 tas-notes 和目录名称保持兼容。查看状态时应以输出的实际 state_directory 为准，Windows 打包应用可能有目录映射。
+当前保存范围包含普通输入、工具调用和返回、最终回复等，不仅是错误。只做有限脱敏，正文仍可能含密码、密钥及业务内容。默认目录为 %LOCALAPPDATA%\Blackbox；技术键 blackbox 和目录名称保持兼容。查看状态时应以输出的实际 state_directory 为准，Windows 打包应用可能有目录映射。
 
 ## 环境要求
 
@@ -29,27 +31,27 @@
 .\install.ps1 -Python 'C:\Path\To\Python\python.exe'
 ```
 
-若本机策略禁止运行脚本，请使用系统允许的执行方式或由管理员处理；不要求降低全局执行策略。默认不创建桌面快捷方式；确有需要时使用 -InstallShortcuts，要求同一 Python 目录有 pythonw.exe。安装器配置本地运行环境，不启用项目，不安装或修改 Codex 的私有配置，不自动关闭已有阅读服务。
+若本机策略禁止运行脚本，请使用系统允许的执行方式或由管理员处理；不要求降低全局执行策略。默认不创建桌面快捷方式；确有需要时使用 -InstallShortcuts，要求同一 Python 目录有 pythonw.exe。安装器配置本地运行环境，并通过官方 CLI 登记插件；不启用新项目，不修改模型/凭据配置，不自动关闭已有阅读服务。只初始化运行环境用 -RuntimeOnly。
 
-插件宿主安装需通过本机 Codex 提供的插件管理入口完成。包中保留本地 marketplace 配置 .agents/plugins/marketplace.json，插件路径为 plugins/tas-notes。不同宿主是否支持该本地入口，必须实际确认；阅读页能够打开不等于 Hook 已安装。若宿主没有相应入口，停止在此处并反馈版本，不通过猜测配置格式绕过。
+包中保留本地 marketplace 配置 .agents/plugins/marketplace.json，插件路径为 plugins/blackbox。脚本检查目标 Codex 能力，再登记并核对缓存文件；也可通过宿主图形市场安装后运行首次设置。阅读页能够打开不等于 Hook 已投递。若宿主没有相应入口，停止并反馈版本，不通过猜测配置格式绕过。
 
-自定义 -StateDir 只影响本地命令和阅读器。若 Hook 宿主没有继承相同的 TAS_NOTES_STATE_DIR 环境变量，仍会使用默认目录；请勿把自定义目录配置成功当作宿主采集成功。
+自定义 -StateDir 只影响本地命令和阅读器。若 Hook 宿主没有继承相同的 BLACKBOX_STATE_DIR 环境变量，仍会使用默认目录；请勿把自定义目录配置成功当作宿主采集成功。
 
 ## 命令入口
 
 启用采集前须明确接受前述保存范围（包括普通事件及有限脱敏），并只指定要授权的项目：
 
 ```powershell
-python .\plugins\tas-notes\scripts\tas_notes.py enable 'D:\YourProject' --accept-capture-scope
+python .\plugins\blackbox\scripts\blackbox.py enable 'D:\YourProject' --accept-capture-scope
 ```
 
 不带确认选项的 enable 只显示说明，不启用项目或创建数据库。随后在该项目的新 Codex 会话中让宿主执行 `python -c "raise RuntimeError('BLACKBOX_ALPHA_HOST_CHECK')"`，在阅读器中确认对应命令、返回及导出。该合成错误是主动验证样例；在外部终端执行或模拟 Hook 不构成真实宿主验收。新开会话后再做一次。主界面“曾收到事件”仅说明本机已有落盘，持续采集完整性仍未知。
 
 ```powershell
-python .\plugins\tas-notes\scripts\tas_notes.py status
-python .\plugins\tas-notes\scripts\tas_notes.py open
-python .\plugins\tas-notes\scripts\tas_notes.py disable 'D:\YourProject'
-python .\plugins\tas-notes\scripts\tas_notes.py stop
+python .\plugins\blackbox\scripts\blackbox.py status
+python .\plugins\blackbox\scripts\blackbox.py open
+python .\plugins\blackbox\scripts\blackbox.py disable 'D:\YourProject'
+python .\plugins\blackbox\scripts\blackbox.py stop
 ```
 
 status 显示配置、事件元信息和容量，不读取会话正文。disable 只停用指定项目，保留历史；stop 只停止阅读服务，不会停用采集。新版本出现 reviewer_build_changed 时，先结束旧阅读服务，再从所需版本打开，不强行覆盖运行实例。
@@ -59,9 +61,9 @@ status 显示配置、事件元信息和容量，不读取会话正文。disable
 备份必须放在采集项目和 Git 仓库之外；目标文件必须不存在。恢复仅写入一个新的目录，恢复后的所有项目默认停用。
 
 ```powershell
-python .\plugins\tas-notes\scripts\tas_notes.py backup 'D:\BlackboxBackups\snapshot.sqlite3'
-python .\plugins\tas-notes\scripts\tas_notes.py restore 'D:\BlackboxBackups\snapshot.sqlite3' 'D:\BlackboxRestore'
-python .\plugins\tas-notes\scripts\tas_notes.py --state-dir 'D:\BlackboxRestore' open
+python .\plugins\blackbox\scripts\blackbox.py backup 'D:\BlackboxBackups\snapshot.sqlite3'
+python .\plugins\blackbox\scripts\blackbox.py restore 'D:\BlackboxBackups\snapshot.sqlite3' 'D:\BlackboxRestore'
+python .\plugins\blackbox\scripts\blackbox.py --state-dir 'D:\BlackboxRestore' open
 ```
 
 备份文件仍含敏感数据。命令执行前先创建备份的父文件夹，恢复目标的父文件夹也必须存在。如果使用自定义状态目录，backup/status/disable/stop 都要在命令名前添加 `--state-dir '实际目录'`，否则会操作默认目录。备份是已验证的 SQLite 快照，只含数据库；运行配置、快捷方式、阅读偏好以及数据库外的诊断文件不会随备份恢复。恢复保守地标记记录连续性未知，不连接恢复边界两侧的操作。
@@ -72,8 +74,8 @@ python .\plugins\tas-notes\scripts\tas_notes.py --state-dir 'D:\BlackboxRestore'
 2. 备份到项目和 Git 仓库之外的新文件，恢复到新的目录；打开恢复目录，检查所需记录并预览导出。失败时保留原库并停止操作。
 3. 停止原目录和恢复目录的阅读服务，完全退出会使用该插件的 Codex 宿主，确保不再有 Hook 写入。仅停止阅读服务不够。
 4. 在文件资源管理器核对完整路径，把原状态目录整体重命名为一个新的归档目录，保留整个目录；不要只移动或删除 notes.sqlite3，也不要操作包目录或项目目录。此步是人工选择，不由安装器自动执行。
-5. 用相同 Python 和原来的状态目录路径重新运行 install.ps1（自定义目录使用 -StateDir）。空库不含项目授权。启动宿主并启用插件，明确重新授权所需项目，再做一次真实宿主检查。自定义目录仍须确认宿主继承 TAS_NOTES_STATE_DIR；未确认时不可声称采集恢复。
-6. 旧归档可用 `python .\plugins\tas-notes\scripts\tas_notes.py --state-dir '归档目录' open` 回看。归档目录中的项目配置可能仍保留之前的状态，请勿将宿主或新的 Hook 指向归档；本流程已要求在归档前逐个停用。
+5. 用相同 Python 和原来的状态目录路径重新运行 install.ps1（自定义目录使用 -StateDir）。空库不含项目授权。启动宿主并启用插件，明确重新授权所需项目，再做一次真实宿主检查。自定义目录仍须确认宿主继承 BLACKBOX_STATE_DIR；未确认时不可声称采集恢复。
+6. 旧归档可用 `python .\plugins\blackbox\scripts\blackbox.py --state-dir '归档目录' open` 回看。归档目录中的项目配置可能仍保留之前的状态，请勿将宿主或新的 Hook 指向归档；本流程已要求在归档前逐个停用。
 
 若只是退出使用：逐个停用项目，通过宿主卸载插件，停止阅读服务，然后人工删除自己安装的包和可选快捷方式。数据库和备份默认保留，不提供自动清理。确实不再需要历史时，先完成以上备份验证并关闭所有写入者，核对状态目录完整路径，再由用户在文件资源管理器删除该目录。删除不可撤销，不把卸载插件等同于删除历史。
 

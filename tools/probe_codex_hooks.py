@@ -26,7 +26,7 @@ def main() -> None:
     if not args.installed:
         config = root / '.codex' / 'hooks.json'
         config.parent.mkdir(parents=True, exist_ok=True)
-        config.write_bytes((project_root / 'plugins' / 'tas-notes' / 'hooks' / 'hooks.json').read_bytes())
+        config.write_bytes((project_root / 'plugins' / 'blackbox' / 'hooks' / 'hooks.json').read_bytes())
     process = subprocess.Popen(
         [shutil.which('codex') or 'codex', 'app-server', '--stdio', '-c', 'features.hooks=true'],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -60,7 +60,7 @@ def main() -> None:
 
     try:
         send({'id': 1, 'method': 'initialize', 'params': {
-            'clientInfo': {'name': 'tas-notes-probe', 'version': '0.1.0'},
+            'clientInfo': {'name': 'blackbox-probe', 'version': '0.1.0'},
             'capabilities': {'experimentalApi': True}}})
         first = wait(1)
         if 'error' in first:
@@ -78,12 +78,12 @@ def main() -> None:
                 'errors': entry.get('errors', []),
                 'hooks': [{key: hook.get(key) for key in ('eventName', 'handlerType', 'timeoutSec', 'source', 'trustStatus', 'command', 'pluginId', 'enabled')}
                           for hook in entry.get('hooks', [])
-                          if (args.installed and (hook.get('pluginId') or '').startswith('tas-notes@'))
+                          if (args.installed and (hook.get('pluginId') or '').startswith('blackbox@'))
                           or (not args.installed and str(root).lower() in hook.get('sourcePath', '').lower())],
             })
         send({'id': 3, 'method': 'plugin/read', 'params': {
             'marketplacePath': str(project_root / '.agents' / 'plugins' / 'marketplace.json'),
-            'pluginName': 'tas-notes'}})
+            'pluginName': 'blackbox'}})
         plugin_reply = wait(3)
         # Only this explicitly addressed local plugin response is printed.
         output['plugin_read'] = plugin_reply.get('result', plugin_reply.get('error'))

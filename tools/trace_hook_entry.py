@@ -1,6 +1,6 @@
 """Temporary runtime trampoline. Forward bounded stdin unchanged; no body logs.
 
-Invoke with original tas_notes.py and arguments. Runtime configuration must be
+Invoke with original blackbox.py and arguments. Runtime configuration must be
 restored after the explicitly authorized experiment. Not a default entry point.
 """
 import json
@@ -9,12 +9,12 @@ from pathlib import Path
 import subprocess
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_capture_probe import CaptureProbe
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_capture_probe import CaptureProbe
 
 
 def main():
-    state = Path(os.environ.get('TAS_NOTES_STATE_DIR', str(Path(os.environ['LOCALAPPDATA'])/'TAS Notes')))
+    state = Path(os.environ.get('BLACKBOX_STATE_DIR', str(Path(os.environ['LOCALAPPDATA'])/'Blackbox')))
     probe = CaptureProbe(state)
     raw = sys.stdin.buffer.read(512*1024+1)
     try:

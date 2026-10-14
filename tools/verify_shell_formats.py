@@ -8,11 +8,11 @@ import subprocess
 import sys
 import tempfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-from tas_notes_launcher import build_id
-import tas_notes_anomalies as anomalies
-from tas_notes_mcp import Reader
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
+from blackbox_launcher import build_id
+import blackbox_anomalies as anomalies
+from blackbox_mcp import Reader
 from verify_bash_coverage import psquote
 
 EXPECTED = {

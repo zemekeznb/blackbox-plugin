@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-const source=fs.readFileSync('plugins/tas-notes/assets/mcp-reader.js','utf8');
+const source=fs.readFileSync('plugins/blackbox/assets/mcp-reader.js','utf8');
 function harness(reply,initialize={},timers={}) {
   const sent=[]; let listener;
   const parent={postMessage(message){sent.push(message);if(!message.id)return;queueMicrotask(()=>{const result=message.method==='ui/initialize'?initialize:typeof reply==='function'?reply(message):reply;if(result?.noReply)return;listener({source:parent,data:{jsonrpc:'2.0',id:message.id,...(result?.rpcError?{error:result.rpcError}:{result})}});});}};

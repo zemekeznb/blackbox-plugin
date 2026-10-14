@@ -18,9 +18,9 @@ import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / 'plugins/tas-notes/scripts'
+SCRIPTS = ROOT / 'plugins/blackbox/scripts'
 sys.path.insert(0, str(SCRIPTS))
-from tas_notes_core import Store
+from blackbox_core import Store
 
 
 class Rpc:
@@ -79,7 +79,7 @@ class Rpc:
                 self.command_metadata.append({key: item.get(key) for key in ('command', 'cwd')})
         if method == 'hook/completed':
             run = params['run']
-            if 'tas-notes' in run.get('sourcePath', '').replace('\\', '/').lower():
+            if 'blackbox' in run.get('sourcePath', '').replace('\\', '/').lower():
                 safe = {key: run.get(key) for key in ('eventName', 'status', 'durationMs')}
                 # Do not retain stderr/stdout bodies even in the synthetic test report.
                 safe['entry_count'] = len(run.get('entries', []))
@@ -150,7 +150,7 @@ def main():
     parser.add_argument('--inspect-hook-shape', action='store_true',
                         help='Record PostToolUse field names/types in the synthetic test state, never values')
     args = parser.parse_args()
-    root = Path(tempfile.mkdtemp(prefix='tas-notes-live-')).resolve()
+    root = Path(tempfile.mkdtemp(prefix='blackbox-live-')).resolve()
     project, state = root / '空白 test project', root / 'state'
     project.mkdir()
     (project / 'fixture.txt').write_text('Synthetic fixture: 中文 content.\n', encoding='utf-8')
@@ -166,8 +166,8 @@ def main():
         }
         for name, source in fixtures.items():
             (project / (name + '.py')).write_text(source, encoding='utf-8')
-    environment = dict(os.environ, TAS_NOTES_STATE_DIR=str(state))
-    subprocess.run([sys.executable, str(SCRIPTS / 'tas_notes.py'), '--state-dir', str(state),
+    environment = dict(os.environ, BLACKBOX_STATE_DIR=str(state))
+    subprocess.run([sys.executable, str(SCRIPTS / 'blackbox.py'), '--state-dir', str(state),
                     'configure-runtime'], check=True, capture_output=True)
     if args.inspect_hook_shape:
         # A test-local runtime trampoline observes stdin then forwards it unchanged.
@@ -191,18 +191,18 @@ def main():
     thread_id = None
     try:
         rpc = Rpc(environment)
-        rpc.request('initialize', {'clientInfo': {'name': 'tas-notes-live-test', 'version': '0.1.0'},
+        rpc.request('initialize', {'clientInfo': {'name': 'blackbox-live-test', 'version': '0.1.0'},
                                   'capabilities': {'experimentalApi': True}})
         rpc.send({'method': 'initialized'})
         hooks = rpc.request('hooks/list', {'cwds': [str(project)]})
         selected = [hook for entry in hooks['data'] for hook in entry.get('hooks', [])
-                    if (hook.get('pluginId') or '').startswith('tas-notes@')]
+                    if (hook.get('pluginId') or '').startswith('blackbox@')]
         if len(selected) != 8 or any(h.get('trustStatus') != 'trusted' or not h.get('enabled') for h in selected):
             raise RuntimeError('Blackbox Plugin requires normal installation and explicit hook trust first')
         reply = rpc.request('thread/start', {'cwd': str(project), 'ephemeral': True,
                             'sandbox': 'read-only', 'approvalPolicy': 'never'})
         thread_id = reply['thread']['id']
-        report['turns'].append(rpc.turn(thread_id, '这是安装测试。不要使用工具。只回复：TAS_NOTES_中文_OK。'))
+        report['turns'].append(rpc.turn(thread_id, '这是安装测试。不要使用工具。只回复：BLACKBOX_中文_OK。'))
         rows = store.listing()
         report['assertions']['record_created'] = bool(rows)
         if args.phase == 'errors':
@@ -210,7 +210,7 @@ def main():
             for name in ('missing', 'silent', 'validation', 'timeout', 'permission', 'retry'):
                 fixture = 'missing' if name == 'retry' else name
                 if name == 'retry':
-                    (project / 'retry-target.txt').write_text('TAS_NOTES_RETRY_OK', encoding='utf-8')
+                    (project / 'retry-target.txt').write_text('BLACKBOX_RETRY_OK', encoding='utf-8')
                 control = None
                 if name != 'permission':
                     observed = subprocess.run([sys.executable, fixture + '.py'], cwd=project,
@@ -229,7 +229,7 @@ def main():
                 # Only synthetic data are inspected; safe report retains format
                 # evidence rather than command paths or complete payloads.
                 signatures = ('FileNotFoundError', 'JSONDecodeError', 'TimeoutExpired',
-                              'PermissionError', 'TAS_NOTES_RETRY_OK', 'Traceback (most recent call last):')
+                              'PermissionError', 'BLACKBOX_RETRY_OK', 'Traceback (most recent call last):')
                 report['samples'].append({'case': name, 'independent': control,
                     'host_commands': rpc.commands[start_commands:],
                     'hook_count': len(captured),
@@ -244,7 +244,7 @@ def main():
                                     'timeout_is_subprocess_not_host_deadline': True}
             expected = {'missing': 'FileNotFoundError', 'validation': 'JSONDecodeError',
                         'timeout': 'TimeoutExpired', 'permission': 'PermissionError',
-                        'retry': 'TAS_NOTES_RETRY_OK'}
+                        'retry': 'BLACKBOX_RETRY_OK'}
             for sample in report['samples']:
                 name = sample['case']
                 report['assertions'][name + '_host_tool_observed'] = bool(sample['host_commands'])
@@ -266,14 +266,14 @@ def main():
             detail = store.detail(rows[0]['id'])
             report['turns'].append(rpc.turn(thread_id,
                 '这是隔离测试，请只读当前目录的 fixture.txt，然后分别执行两条无副作用命令：'
-                'cmd.exe /d /c exit 7 和 cmd.exe /d /c echo TAS_NOTES_TOOL_OK。'
+                'cmd.exe /d /c exit 7 和 cmd.exe /d /c echo BLACKBOX_TOOL_OK。'
                 '前一条预期失败，不要修复或重试。不要访问其他文件、网络或额外 Agent。最后报告结果。'))
             report['turns'].append(rpc.turn(thread_id,
                 '【测试反馈】还是有问题，请保留之前的调查。不要使用工具。只回复：已记录后续反馈，尚未验收。'))
             updated = store.detail(detail['id'])
             contents = [json.loads(e['content']) for e in updated['events'] if e['kind'] == 'PostToolUse']
             report['assertions']['tool_success_output_captured'] = any(
-                'TAS_NOTES_TOOL_OK' in str(c.get('tool_response', '')) for c in contents)
+                'BLACKBOX_TOOL_OK' in str(c.get('tool_response', '')) for c in contents)
             report['assertions']['failed_command_captured'] = any(
                 'exit 7' in str(c.get('tool_input', '')) for c in contents)
             # PowerShell can map a native exit 7 to its own nonzero exit 1.
@@ -286,7 +286,7 @@ def main():
             report['assertions']['correction_captured'] = '还是有问题' in updated['draft']
             before = len(updated['events'])
             store.set_project(str(project), False)
-            report['turns'].append(rpc.turn(thread_id, '不要使用工具，只回复：TAS_NOTES_DISABLED_OK。'))
+            report['turns'].append(rpc.turn(thread_id, '不要使用工具，只回复：BLACKBOX_DISABLED_OK。'))
             report['assertions']['disabled_no_append'] = len(store.detail(detail['id'])['events']) == before
         if args.phase == 'lifecycle' and rows:
             first_id = rows[0]['id']
@@ -294,7 +294,7 @@ def main():
             report['assertions']['compact_hooks_observed'] = rpc.until(
                 lambda: any(h['eventName'] == 'postCompact' for h in rpc.hooks), timeout=150)
             before_count = len(store.detail(first_id)['events'])
-            report['turns'].append(rpc.turn(thread_id, '压缩后的测试。不要使用工具，只回复：TAS_NOTES_AFTER_COMPACT。'))
+            report['turns'].append(rpc.turn(thread_id, '压缩后的测试。不要使用工具，只回复：BLACKBOX_AFTER_COMPACT。'))
             report['assertions']['after_compact_same_record'] = (
                 len(store.listing()) == 1 and len(store.detail(first_id)['events']) > before_count)
             # Interrupt a synthetic no-tools turn once its prompt hook has actually run.
@@ -314,7 +314,7 @@ def main():
             reply = rpc.request('thread/start', {'cwd': str(project), 'ephemeral': True,
                                 'sandbox': 'read-only', 'approvalPolicy': 'never'})
             thread_id = reply['thread']['id']
-            report['turns'].append(rpc.turn(thread_id, '新会话测试。不要使用工具，只回复：TAS_NOTES_NEW_SESSION。'))
+            report['turns'].append(rpc.turn(thread_id, '新会话测试。不要使用工具，只回复：BLACKBOX_NEW_SESSION。'))
             report['assertions']['new_session_separate_record'] = len(store.listing()) == 2
             rpc.unsubscribe(thread_id)
             other = root / 'not enabled'
@@ -323,7 +323,7 @@ def main():
             reply = rpc.request('thread/start', {'cwd': str(other), 'ephemeral': True,
                                 'sandbox': 'read-only', 'approvalPolicy': 'never'})
             thread_id = reply['thread']['id']
-            report['turns'].append(rpc.turn(thread_id, '未启用项目测试。不要使用工具，只回复：TAS_NOTES_OPT_OUT。'))
+            report['turns'].append(rpc.turn(thread_id, '未启用项目测试。不要使用工具，只回复：BLACKBOX_OPT_OUT。'))
             report['assertions']['other_project_not_recorded'] = before == [
                 (r['id'], r['source_seq']) for r in store.listing()]
         rpc.unsubscribe(thread_id)
@@ -333,7 +333,7 @@ def main():
                 shutil.which('codex') or 'codex', '--no-daemon', '-a', 'never',
                 'exec', '--ephemeral', '--skip-git-repo-check', '--json',
                 '-s', 'read-only', '-c', 'features.hooks=true', '-C', str(project),
-                '正常退出测试。不要使用工具，只回复：TAS_NOTES_EXIT。'],
+                '正常退出测试。不要使用工具，只回复：BLACKBOX_EXIT。'],
                 env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL, timeout=180,
                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))

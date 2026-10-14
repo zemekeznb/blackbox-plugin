@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-from tas_notes_anomalies import detect
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
+from blackbox_anomalies import detect
 
 TOOL = 'mcp__blackbox_error_probe__run_case'
 MARKERS = {'success': 'NOTES046_SUCCESS', 'error': 'NOTES046_TOOL_ERROR',

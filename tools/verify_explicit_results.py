@@ -10,7 +10,7 @@ import time
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from verify_curl_errors import main,anomalies,psquote
 from verify_quality_errors import TRACE
-from tas_notes_curl_result import FORMAT,MARKER
+from blackbox_curl_result import FORMAT,MARKER
 
 CASES={**{name+'_log':(None,0) for name in ('cat','gc','type')},
        **{name+'_missing':('powershell-diagnostic',1) for name in ('cat','gc','type')},

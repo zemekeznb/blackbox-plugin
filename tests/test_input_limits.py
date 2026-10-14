@@ -12,11 +12,11 @@ import threading
 import unittest
 from unittest.mock import patch
 
-SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'
+SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'
 sys.path.insert(0, str(SCRIPTS))
-import tas_notes_core as core
-import tas_notes_anomalies as anomalies
-from tas_notes_diagnostics import last_error, unscoped_error
+import blackbox_core as core
+import blackbox_anomalies as anomalies
+from blackbox_diagnostics import last_error, unscoped_error
 
 TRACE = 'Traceback (most recent call last):\n  File "x.py", line 1, in <module>\nTypeError: synthetic\n'
 
@@ -68,7 +68,7 @@ class InputLimitTests(unittest.TestCase):
     def test_cli_rejects_fail_open_without_echoing_or_saving_oversized_content(self):
         secret = 'synthetic-secret-' * core.MAX_INPUT
         raw = json.dumps(self.payload(tool_response=secret)).encode()
-        process = subprocess.run([sys.executable, str(SCRIPTS / 'tas_notes.py'), '--state-dir',
+        process = subprocess.run([sys.executable, str(SCRIPTS / 'blackbox.py'), '--state-dir',
                                   str(self.store.directory), 'hook'], input=raw, capture_output=True,
                                  timeout=15, check=False)
         self.assertEqual(process.returncode, 0)

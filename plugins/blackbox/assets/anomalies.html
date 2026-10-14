@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blackbox Plugin · 执行异常</title>
+  <link rel="stylesheet" href="./review.css"><script src="./anomalies.js" defer></script>
+</head>
+<body class="anomaly-app">
+  <header class="app-header">
+    <div class="brand" aria-label="Blackbox"><svg class="brand-mark" viewBox="0 0 96 96" fill="none" aria-hidden="true"><rect x="8" y="8" width="80" height="80" rx="22" fill="#20242C"/><path d="M25 59H36V34H59V59H71" stroke="#F98A5B" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="71" cy="59" r="6" fill="#FFF8F3"/></svg><svg class="brand-wordmark" viewBox="0 0 102.692 28" width="102.692" height="28" aria-hidden="true"><path fill="#242932" transform="translate(0.000 22) scale(0.023000 -0.023000)" d="M209 -5V109H392Q442 109 468.0 136.5Q494 164 494 212Q494 260 468.0 286.5Q442 313 392 313H209V400H382Q455 400 512.5 382.5Q570 365 602.5 324.0Q635 283 635 214V200Q635 135 606.5 89.5Q578 44 521.5 19.5Q465 -5 382 -5ZM90 -5V735H229V-5ZM209 336V423H365Q416 423 440.0 450.0Q464 477 464 522Q464 567 440.0 594.0Q416 621 365 621H209V735H352Q476 735 540.5 683.0Q605 631 605 534V520Q605 452 572.5 411.5Q540 371 483.0 353.5Q426 336 352 336Z"/><path fill="#242932" transform="translate(14.874 22) scale(0.023000 -0.023000)" d="M86 0V730H225V0ZM18 626V730H225V626Z"/><path fill="#242932" transform="translate(20.939 22) scale(0.023000 -0.023000)" d="M408 0V161H385V340Q385 387 362.0 410.0Q339 433 291 433Q266 433 231.0 432.0Q196 431 160.5 429.5Q125 428 97 426V544Q120 546 149.0 548.0Q178 550 208.5 550.5Q239 551 266 551Q350 551 405.5 529.0Q461 507 489.5 460.0Q518 413 518 337V0ZM233 -14Q174 -14 129.5 7.0Q85 28 60.5 67.0Q36 106 36 161Q36 221 65.5 259.0Q95 297 148.5 316.0Q202 335 274 335H400V252H272Q224 252 198.5 228.5Q173 205 173 168Q173 131 198.5 108.0Q224 85 272 85Q301 85 325.5 95.5Q350 106 366.5 131.5Q383 157 385 201L419 162Q414 105 391.5 66.0Q369 27 329.5 6.5Q290 -14 233 -14Z"/><path fill="#242932" transform="translate(33.513 22) scale(0.023000 -0.023000)" d="M320 -19Q249 -19 197.5 5.0Q146 29 111.5 69.0Q77 109 60.0 159.0Q43 209 43 261V280Q43 335 60.5 385.5Q78 436 113.0 475.5Q148 515 199.5 538.5Q251 562 319 562Q390 562 446.0 534.5Q502 507 535.5 458.0Q569 409 573 344H438Q433 386 402.5 414.0Q372 442 319 442Q273 442 242.5 420.0Q212 398 197.0 359.5Q182 321 182 271Q182 223 196.5 184.0Q211 145 241.5 123.0Q272 101 320 101Q356 101 382.0 114.0Q408 127 423.5 150.0Q439 173 443 202H578Q574 136 539.5 86.5Q505 37 448.5 9.0Q392 -19 320 -19Z"/><path fill="#242932" transform="translate(46.593 22) scale(0.023000 -0.023000)" d="M459 0 277 254H196L427 543H572L359 276L362 346L616 0ZM79 0V730H218V0Z"/><path fill="#b6532f" transform="translate(59.834 22) scale(0.023000 -0.023000)" d="M386 -18Q320 -18 268.5 11.0Q217 40 187.5 95.0Q158 150 155 228H179V0H86V730H203V370L168 305Q171 391 201.5 446.5Q232 502 282.0 529.0Q332 556 394 556Q451 556 497.5 535.0Q544 514 577.5 476.5Q611 439 628.5 389.0Q646 339 646 281V261Q646 203 628.0 153.0Q610 103 575.5 64.5Q541 26 493.0 4.0Q445 -18 386 -18ZM365 83Q414 83 451.0 107.0Q488 131 508.5 173.5Q529 216 529 271Q529 327 508.0 368.5Q487 410 450.5 433.0Q414 456 365 456Q321 456 283.0 436.0Q245 416 222.0 378.5Q199 341 199 288V245Q199 194 222.5 157.5Q246 121 284.0 102.0Q322 83 365 83Z"/><path fill="#b6532f" transform="translate(74.846 22) scale(0.023000 -0.023000)" d="M339 -18Q268 -18 214.0 5.5Q160 29 123.0 68.0Q86 107 67.0 156.5Q48 206 48 259V279Q48 332 67.5 382.0Q87 432 124.5 471.5Q162 511 216.0 534.0Q270 557 339 557Q408 557 461.5 534.0Q515 511 553.0 471.5Q591 432 610.5 382.0Q630 332 630 279V259Q630 206 611.0 156.5Q592 107 555.0 68.0Q518 29 464.0 5.5Q410 -18 339 -18ZM339 84Q394 84 433.0 108.5Q472 133 492.5 175.0Q513 217 513 269Q513 322 492.0 364.0Q471 406 432.0 430.5Q393 455 339 455Q285 455 246.0 430.5Q207 406 186.0 364.0Q165 322 165 269Q165 217 185.5 175.0Q206 133 245.0 108.5Q284 84 339 84Z"/><path fill="#b6532f" transform="translate(89.490 22) scale(0.023000 -0.023000)" d="M23 0 207 285 203 264 31 539H159L278 343H293L405 539H525L362 268L365 287L558 0H430L290 211H276L143 0Z"/></svg></div>
+    <button id="help-mobile" class="mobile-help" aria-haspopup="dialog">采集与隐私</button>
+  </header>
+  <section id="file-preview" hidden class="notice"><strong>当前是页面文件预览。</strong><p>请双击桌面或开始菜单的 Blackbox Plugin 打开本地记录。</p></section>
+  <main id="workspace" data-stage="reading">
+    <aside id="navigation" class="session-navigation" aria-label="项目与会话">
+      <div class="navigation-heading"><h2>工作空间</h2></div>
+      <p id="context-status" class="muted" role="status">正在读取项目…</p>
+      <input id="session-scope" type="hidden" value="active"><details id="scope-picker" class="time-picker"><summary id="scope-label" aria-label="会话列表">当前会话</summary><div class="time-options" role="group" aria-label="会话列表选项"><button id="scope-active" type="button" aria-pressed="true">当前会话</button><button id="scope-archived" type="button" aria-pressed="false">已归档</button></div></details>
+      <nav id="project-tree" aria-label="已保存会话"></nav>
+      <button id="nav-return" class="mobile-navigation" hidden>返回当前会话 →</button>
+      <button id="help-open" class="privacy-entry" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 8 4v5c0 5-8 9-8 9s-8-4-8-9V7z"/></svg> 采集与隐私</button>
+    </aside>
+    <div id="reader" class="reader">
+    <section id="onboarding" hidden aria-labelledby="onboarding-title">
+      <div id="onboarding-navigation"></div>
+      <p class="onboarding-eyebrow">执行记录</p>
+      <div class="onboarding-content">
+        <span class="onboarding-symbol" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m12 3 9 5v9l-9 5-9-5V8zM3 8l9 5 9-5M12 13v9M7.5 5.5l9 5"/></svg></span>
+        <h1 id="onboarding-title">从第一个项目开始</h1>
+        <p id="onboarding-description" class="muted"></p>
+        <div id="onboarding-start" class="onboarding-actions"><button id="onboarding-check" class="privacy-link">已完成接入，检查状态</button><button id="onboarding-connect" class="primary">接入第一个项目</button><button id="onboarding-privacy" class="privacy-link">先了解保存范围 →</button></div>
+        <div id="onboarding-project" hidden><strong id="onboarding-project-name"></strong><p id="onboarding-project-state" class="muted"></p></div>
+        <div id="onboarding-steps"><div><small>01</small><h3>选择一个项目</h3><p>在该项目的 Codex 会话中接入。</p></div><div><small>02</small><h3>确认保存范围</h3><p>由你决定是否启用本地采集。</p></div><div><small>03</small><h3>继续原来的工作</h3><p>首次安装并信任 Hook 后，可能需要完整退出并重新打开 Codex；无需重启电脑。</p></div></div>
+        <div id="onboarding-wait" hidden><button id="onboarding-status" class="privacy-link">查看采集状态 →</button><details><summary>没有看到预期的记录？</summary><p>确认对应项目已启用采集，继续在该项目的 Codex 用户会话中工作，再刷新查看。宿主未送达或身份无法确认的事件不会保存，也不会自动补回。</p></details><button id="onboarding-refresh" class="onboarding-refresh" aria-label="刷新记录" title="刷新记录"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.1a8 8 0 0 1 13.2 3M4.7 14.9a8 8 0 0 0 13.2 3"/></svg></button><p id="onboarding-feedback" role="status"></p></div>
+        <p class="onboarding-footnote">仅采集你明确启用的项目 · 默认保存在本机</p>
+      </div>
+    </section>
+    <p id="capacity-warning" class="notice" hidden></p><p id="status" role="status" aria-live="polite"></p>
+    <button id="onboarding-retry" hidden>重新检查状态</button>
+    <section id="list-view" aria-labelledby="list-heading">
+      <div id="list-navigation"><button id="browse-sessions" class="mobile-navigation back-button">← 项目与会话</button></div>
+      <div class="page-heading"><div class="list-title"><h1 id="list-heading" tabindex="-1">异常记录</h1><p id="session-description" class="intro">从项目中选择会话</p></div><details id="session-actions" hidden class="action-picker"><summary id="session-actions-label" aria-label="会话操作"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></summary><div class="action-options"><button id="archive-session" type="button">归档会话</button><button id="delete-session" type="button">删除会话本地记录</button></div></details><button id="refresh" class="list-refresh" aria-label="刷新记录"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 6.1a8 8 0 0 1 13.2 3M4.7 14.9a8 8 0 0 0 13.2 3"/></svg></button></div>
+      <section id="session-confirm" hidden class="notice" aria-label="确认会话操作"><p id="session-confirm-text"></p><p id="session-confirm-status" role="status"></p><button id="session-confirm-apply" type="button">确认</button><button id="session-confirm-cancel" type="button">取消</button></section>
+      <form id="filters" class="filters">
+        <input id="project" type="hidden"><input id="session" type="hidden">
+        <div><label for="time">记录时间</label><select id="time" hidden aria-hidden="true" tabindex="-1"><option value="all">全部时间</option><option value="today">今天</option><option value="week">近七天</option><option value="custom">自定义日期</option></select><details id="time-picker" class="time-picker"><summary id="time-label" aria-label="记录时间">全部时间</summary><div class="time-options" role="group" aria-label="记录时间选项"><button id="time-all" aria-label="全部时间" type="button" aria-pressed="true">全部时间</button><button id="time-today" aria-label="今天" type="button" aria-pressed="false">今天</button><button id="time-week" aria-label="近七天" type="button" aria-pressed="false">近七天</button><button id="time-custom" aria-label="自定义日期" type="button" aria-pressed="false">自定义日期</button></div></details></div>
+        <div><label>异常类型</label><input id="anomaly-type" type="hidden"><details id="type-picker" class="type-picker"><summary id="type-label">全部异常</summary><div class="type-options"><input id="type-search" type="search" maxlength="200" placeholder="搜索当前会话的异常类型" aria-label="搜索异常类型"><div id="type-options"></div><p id="type-status" class="muted" role="status"></p></div></details></div>
+        <div id="date-range" class="date-range" hidden><button id="range-open" type="button" class="date-trigger" aria-expanded="false" aria-controls="calendar"><span id="range-label">选择日期范围</span><span aria-hidden="true">⌄</span></button><input id="start" type="hidden"><input id="end" type="hidden"><div id="calendar" class="calendar" hidden role="group" aria-label="选择日期"><div class="calendar-heading"><button id="month-prev" type="button" aria-label="上个月">‹</button><div class="calendar-title"><button id="calendar-year" type="button" aria-label="选择年份"></button><button id="calendar-month" type="button" aria-label="选择月份"></button></div><button id="month-next" type="button" aria-label="下个月">›</button></div><div id="calendar-week" class="calendar-week" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="calendar-days" class="calendar-days"></div><p id="calendar-hint" class="calendar-hint" role="status">选择开始日期</p><div class="calendar-actions"><button id="date-clear" type="button">清空</button><button id="date-today" type="button">今天</button><button id="date-close" type="button">关闭</button></div></div></div><div class="filter-actions"><button id="apply" type="submit" hidden>筛选</button><button id="clear" type="button" hidden><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4v6h6M3 10a9 9 0 1 1 1 8"/></svg><span>重置筛选</span></button></div>
+      </form>
+      <p id="list-loading" role="status" hidden>正在更新记录…</p>
+      <div class="list-summary"><p id="list-status" role="status">正在读取记录…</p><div class="selection-controls"><button id="deselect-all" type="button" hidden>取消全选</button><button id="select-anomalies" type="button">选择</button></div></div>
+      <div id="selection-scope" class="selection-scope" hidden><button id="delete-filtered" type="button" aria-pressed="false">选择全部匹配记录</button><small>包含尚未加载的匹配记录</small></div>
+      <div id="records" class="cards"></div>
+      <div id="list-empty" class="empty-state" hidden><span class="empty-symbol" aria-hidden="true">—</span><h2>暂未找到匹配记录</h2></div>
+      <div class="list-bottom"><p id="record-count" role="status"></p><button id="more" hidden>加载更多</button></div>
+      <div id="selection-bar" class="selection-bar" hidden><span id="selection-count" role="status">已选 0 条</span><button id="delete-selected" type="button" disabled><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg><span>删除所选</span></button></div>
+    </section>
+    <section id="detail-view" aria-labelledby="record-heading" hidden>
+      <div id="detail-empty" class="detail-placeholder"><span class="placeholder-icon">≡</span><h2>选择一条异常记录</h2><p>从异常列表打开记录，查看执行命令与错误返回。</p></div>
+      <p id="detail-context" class="detail-context" hidden></p><div id="detail-toolbar" class="detail-toolbar"><button id="back" class="back-button">← 返回记录</button><h1 id="record-heading" tabindex="-1"></h1><button id="delete-anomaly" type="button">删除异常</button><button id="export" class="primary" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5M4 15v5h16v-5"/></svg><span>预览导出</span></button></div>
+      <p id="detail-status" role="status" aria-live="polite"></p><button id="retry" hidden>重新加载详情</button>
+      <div id="detail" hidden>
+        <p id="raw-heading" class="raw-heading" hidden></p><p id="meta" class="detail-meta"></p>
+
+        <article id="reading" aria-label="操作与返回"></article>
+
+        <p class="download-note">此页展示已保存的返回内容，不判断根因或修复状态。</p>
+        <section id="export-preview" class="export-preview" hidden aria-label="完整导出文件预览">
+          <h2>完整导出文件预览</h2>
+          <p>以下全部内容（包括已保存来源字段）将写入文件。仅做有限脱敏，请检查密码、密钥和业务内容；下载不会上传。</p>
+          <pre id="export-preview-text" tabindex="0"></pre>
+          <p id="export-preview-status" role="status"></p>
+          <button id="export-download" class="primary" disabled>下载此预览</button>
+          <button id="export-save" hidden disabled>保存到下载文件夹</button>
+          <button id="export-close">关闭预览</button>
+        </section>
+      </div>
+    </section>
+    </div>
+  </main>
+  <section id="connect-project" class="capture-confirm" hidden><div class="capture-dialog connect-dialog" role="dialog" aria-modal="true" aria-labelledby="connect-title"><div class="privacy-summary"><h2 id="connect-title">接入第一个项目</h2><button id="connect-close" aria-label="关闭接入说明">×</button></div><p class="muted">在你想记录的项目中完成接入。</p><h3>1. 打开目标项目的 Codex 会话</h3><p class="muted">使用已有会话，或在这个项目下新建会话。</p><h3>2. 复制并发送这段提示词</h3><p id="connect-prompt" class="connect-prompt"></p><button id="connect-copy" class="primary">复制接入提示词</button><p id="connect-copy-status" role="status"></p><h3>3. 由 Codex 完成接入并验证</h3><p class="muted">发送前请确认提示词中的保存范围与授权；采集不仅限于异常。首次安装并信任 Hook 后，可能需要保存工作、完整退出并重新打开 Codex 才能生效，无需重启电脑。若 Codex 提示需要重启，请重开后回到原会话继续验证采集，无需重复授权。</p><div class="connect-footer"><button id="connect-privacy" class="privacy-link">了解保存范围 →</button><button id="connect-check">已完成接入，检查状态</button><button id="connect-done">知道了</button></div></div></section>
+  <details id="help" class="privacy-overlay" tabindex="-1"><summary hidden>采集与隐私</summary>
+    <div id="privacy-drawer" class="privacy-drawer" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="privacy-heading"><h2 id="help-title">采集与隐私</h2><button id="help-close" aria-label="关闭采集与隐私">×</button></div>
+      <div class="privacy-tabs" role="tablist" aria-label="采集与隐私"><button id="help-tab-0" role="tab" aria-selected="true" aria-controls="help-panel-0" tabindex="0">项目管理</button><button id="help-tab-1" role="tab" aria-selected="false" aria-controls="help-panel-1" tabindex="-1">保存与隐私</button><button id="help-tab-2" role="tab" aria-selected="false" aria-controls="help-panel-2" tabindex="-1">使用与排查</button></div>
+      <div class="help-content">
+        <section id="help-panel-0" role="tabpanel" aria-labelledby="help-tab-0">
+          <h2>已管理的项目</h2><p class="muted">所有曾启用采集的项目都在这里，无需切换工作空间。停用后仍可再次启用。</p>
+          <div class="privacy-summary"><span id="capture-status" role="status">正在读取…</span><button id="privacy-learn" class="privacy-link">了解保存范围与隐私 →</button></div>
+          <div id="capture-projects"></div>
+
+          <p id="help-action-status" role="status"></p>
+          <div class="privacy-storage"><div class="privacy-summary"><h2>本地存储</h2><span id="storage-value" class="muted">正在读取…</span></div><progress id="storage-meter" aria-label="数据库空间占用" max="100" value="0"></progress><p class="muted">所有项目共用此容量。记录不会自动过期，归档只整理列表，不释放空间。</p>
+          <p id="storage-warning" role="status" hidden></p><div id="cleanup-pending"></div><div class="storage-help"><button id="storage-help-trigger" aria-label="如何管理本地记录" aria-controls="storage-help-text" aria-expanded="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1-1.5 3m0 2v1"/></svg> 管理本地记录</button><button id="cleanup-open" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7"/></svg>清理记录</button><div id="storage-help-text" hidden>在工作空间中选择会话，打开会话菜单，可归档或永久删除该会话的 Blackbox 记录。永久删除不可恢复，不会删除 Codex 会话，也不会删除已导出的文件和备份。需要保留的内容，请先导出。删除时会自动释放可用容量并整理存储空间。</div></div></div>
+        </section>
+        <section id="help-panel-1" role="tabpanel" aria-labelledby="help-tab-1" hidden>
+          <h2>哪些内容会被保存？</h2>
+          <div class="privacy-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg><div>输入与最终回复<p class="muted">在已启用项目的用户会话（含归档）中，保存 Codex 送达的可见输入、最终回复等事件。</p></div></div>
+          <div class="privacy-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 6 6-6 6m9 0h7"/></svg><div>工具调用与返回<p class="muted">保存宿主送达的调用参数和返回内容，不仅限于报错的调用。</p></div></div>
+          <div class="privacy-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7.4M3 4v7h7m2-4v5l3 2"/></svg><div>会话与执行过程记录<p class="muted">用于组织记录，并在明确边界内关联相同输入的再次调用。</p></div></div>
+          <div class="privacy-section"><h2>本地保存与分享</h2><p class="muted">Blackbox 的采集和阅读不自动上传记录、不额外调用模型。这不改变 Codex 自身的模型请求与联网行为。</p><p class="muted">记录经过有限脱敏，仍可能包含密钥、路径或业务内容。分享导出文件前，请检查完整预览。</p></div>
+          <details><summary>停用、归档和删除有什么区别？</summary><p>停用：停止该项目后续采集，保留已有记录。</p><p>归档：将会话移入已归档列表，可以恢复；不会到期删除，也不会释放存储空间。</p><p>永久删除：删除该会话的 Blackbox 本地记录，不删除 Codex 会话；已导出的文件和备份不会随之删除。</p></details>
+          <details><summary>容量满了会怎样？</summary><p>数据库达到 256 MiB 上限后，将拒收新事件；已有记录仍可查看和导出。可删除不再需要的异常，或按日期清理全部采集记录；释放足够容量后恢复接收新事件，受限期间的事件不会自动补回。备份与导出文件不计入此额度。</p><p>单个会话的普通额度为 5,000 条事件或 10 MiB，任一先到即受限；另有少量错误记录预留额度。事件数量不等于异常卡片数量。</p></details>
+        </section>
+        <section id="help-panel-2" role="tabpanel" aria-labelledby="help-tab-2" hidden>
+          <div class="privacy-guidance"><h2>项目管理</h2><p class="muted">在“项目管理”中启用或停用已有项目。安装插件不会自动开启采集。</p><button id="privacy-projects" class="privacy-link">前往项目管理 →</button></div>
+          <details><summary>没有看到预期记录？</summary><p>1. 确认对应项目已启用采集。<br>2. 检查所选会话，恢复全部时间和异常类型，再刷新记录。<br>3. 在“项目管理”中检查容量是否已满。</p><p>列表为空不代表没有错误：宿主未送达、没有明确错误输出或不匹配识别格式的记录，可能不会显示。</p><p>内部及临时会话不采集。会话身份暂时无法确认时，相关事件不保存，也不会自动补回。</p></details>
+          <details><summary>关闭面板会停用采集吗？</summary><p>不会。关闭面板只结束查看。要停止采集，请在“项目管理”中停用对应项目；已有记录会保留。</p></details>
+          <details><summary>如何接入新项目？</summary><div class="privacy-prompt-heading"><p>在目标项目的 Codex 会话中，粘贴并发送以下提示词：</p><button id="capture-prompt-copy" aria-label="复制新项目接入提示词" title="复制提示词"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></svg></button></div><div class="privacy-prompt"><p id="capture-prompt">请直接为当前项目完成 Blackbox 本地采集接入。我同意仅记录当前项目的可见输入、回复、工具调用及返回，内容可能包含项目资料或敏感信息，默认不上传。我授权你检查并配置运行环境，审阅已安装 Blackbox 的本地采集 Hook，确认其用途与上述范围一致后，通过 Codex 官方流程完成信任并启用当前项目，无需重复询问。随后执行一条无副作用的真实命令，核验对应记录确已收到。不要改动其他项目、清除历史或模拟记录；只有必须由我操作或超出上述授权时才暂停，并给出最少必要步骤。</p></div><p id="capture-copy-status" role="status"></p></details>
+          <details><summary>运行信息</summary><p id="application-status" class="muted"></p><p>支持环境：Windows · Codex 桌面客户端</p><p>反馈问题时，请附上插件版本、具体操作和错误提示。分享前请检查敏感信息。</p><button id="shutdown" hidden>停止阅读服务</button></details>
+        </section>
+      </div>
+      <div class="privacy-footer"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 8 4v5c0 5-8 9-8 9s-8-4-8-9V7z"/><path d="m8 12 3 3 5-6"/></svg>仅采集明确启用的项目</span><button id="help-done">完成</button></div>
+    </div>
+    <section id="capture-confirm" class="capture-confirm" hidden><div class="capture-dialog" role="dialog" aria-modal="true" aria-labelledby="capture-confirm-title" aria-describedby="capture-confirm-text"><h2 id="capture-confirm-title"></h2><p id="capture-confirm-path" class="muted"></p><p id="capture-confirm-text"></p><label id="capture-consent-label"><input id="capture-consent" type="checkbox">我已了解保存范围，同意启用此项目的采集。</label><div class="privacy-summary"><button id="capture-cancel">取消</button><button id="capture-apply" class="primary">确认</button></div><p id="capture-progress" role="status"></p></div></section>
+  </details>
+  <section id="cleanup-dialog" class="cleanup-overlay" hidden><div class="cleanup-dialog" role="dialog" aria-modal="true" aria-labelledby="cleanup-title">
+    <div class="cleanup-heading"><h2 id="cleanup-title">清理本地记录</h2><button id="cleanup-close" type="button" aria-label="关闭清理弹窗">×</button></div>
+    <p id="cleanup-step" class="cleanup-step" hidden>选择范围 → 预览并确认</p>
+    <div id="cleanup-date-fields" hidden>
+      <label id="cleanup-scope-caption">清理范围</label><input id="cleanup-scope" type="hidden">
+      <details id="cleanup-scope-picker" class="time-picker"><summary id="cleanup-scope-label" aria-labelledby="cleanup-scope-caption cleanup-scope-label">选择范围</summary><div id="cleanup-scope-options" class="time-options" role="group" aria-label="清理范围选项"></div></details>
+      <div class="cleanup-dates"><div><label for="cleanup-start-open">开始日期</label><input id="cleanup-start" type="hidden"><button id="cleanup-start-open" type="button" class="date-trigger" aria-expanded="false" aria-controls="cleanup-calendar">不限开始日期</button></div><div><label for="cleanup-end-open">结束日期</label><input id="cleanup-end" type="hidden"><button id="cleanup-end-open" type="button" class="date-trigger" aria-expanded="false" aria-controls="cleanup-calendar">选择结束日期</button></div></div>
+      <div id="cleanup-calendar" class="calendar cleanup-calendar" hidden role="group" aria-label="清理日期选择"><div class="calendar-heading"><button id="cleanup-month-prev" type="button" aria-label="上一页日期">‹</button><div class="calendar-title"><button id="cleanup-calendar-year" type="button" aria-label="选择清理年份"></button><button id="cleanup-calendar-month" type="button" aria-label="选择清理月份"></button></div><button id="cleanup-month-next" type="button" aria-label="下一页日期">›</button></div><div id="cleanup-calendar-week" class="calendar-week" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="cleanup-calendar-days" class="calendar-days"></div><div class="calendar-actions"><button id="cleanup-date-clear" type="button">清空</button><button id="cleanup-date-today" type="button">今天</button><button id="cleanup-date-close" type="button">关闭</button></div></div>
+      <p class="muted cleanup-date-hint">开始留空表示此前全部，结束包含当天。按本机保存时间计算，预览后固定边界。</p><p class="cleanup-info">会清理范围内的全部采集记录，包括输入、回复、正常调用和异常。采集设置保持不变。</p>
+    </div>
+    <div id="cleanup-summary"></div><p id="cleanup-danger" hidden>永久删除不可恢复。需要保留的内容，请先导出。不会删除 Codex 中的内容、项目文件、已导出文件或外部备份。</p>
+    <label id="cleanup-confirm-label" hidden><span id="cleanup-confirm-caption">输入“清理”确认</span><input id="cleanup-confirm-word" autocomplete="off"></label>
+    <p id="cleanup-result" role="status" aria-live="polite"></p><div class="cleanup-toolbar"><button id="cleanup-back" type="button" hidden>返回修改</button><button id="cleanup-cancel" type="button">取消</button><button id="cleanup-preview" type="button" class="primary" hidden>预览清理范围</button><button id="cleanup-apply" type="button" disabled>永久删除</button><button id="cleanup-retry" type="button" hidden>重试空间回收</button></div>
+  </div></section>
+  <footer>Blackbox Plugin <span>留下过程，方便回看。</span></footer>
+</body>
+</html>

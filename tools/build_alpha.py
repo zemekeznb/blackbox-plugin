@@ -19,21 +19,21 @@ import tempfile
 import zipfile
 
 
-PLUGIN = 'plugins/tas-notes/'
+PLUGIN = 'plugins/blackbox/'
 SCRIPT_NAMES = (
-    'open_notes.py', 'tas_notes.py', 'tas_notes_anomalies.py', 'tas_notes_backup.py',
-    'tas_notes_business_errors.py', 'tas_notes_capture_probe.py', 'tas_notes_codex.py',
-    'tas_notes_core.py', 'tas_notes_curl_errors.py', 'tas_notes_curl_result.py',
-    'tas_notes_diagnostics.py', 'tas_notes_http_errors.py', 'tas_notes_launcher.py',
-    'tas_notes_mcp.py', 'tas_notes_shell_errors.py', 'tas_notes_sse_errors.py',
-    'tas_notes_admission.py', 'tas_notes_preflight.py', 'tas_notes_sessions.py', 'tas_notes_cleanup.py',
-    'tas_notes_summary.py', 'tas_notes_transport_errors.py', 'tas_notes_web.py',
+    'open_notes.py', 'blackbox.py', 'blackbox_anomalies.py', 'blackbox_backup.py',
+    'blackbox_business_errors.py', 'blackbox_capture_probe.py', 'blackbox_codex.py',
+    'blackbox_core.py', 'blackbox_curl_errors.py', 'blackbox_curl_result.py',
+    'blackbox_diagnostics.py', 'blackbox_http_errors.py', 'blackbox_launcher.py',
+    'blackbox_mcp.py', 'blackbox_shell_errors.py', 'blackbox_sse_errors.py',
+    'blackbox_admission.py', 'blackbox_preflight.py', 'blackbox_sessions.py', 'blackbox_cleanup.py',
+    'blackbox_summary.py', 'blackbox_transport_errors.py', 'blackbox_web.py', 'blackbox_install.py', 'blackbox_compat.py',
     'launch.cmd', 'install_shortcuts.ps1',
 )
 ASSET_NAMES = ('anomalies.html', 'anomalies.js', 'mcp-reader.js', 'review.css',
                'review.html', 'review.js')
 TEST_HELPERS = (
-    'tools/build_alpha.py', 'tools/verify_alpha_candidate.py',
+    'tools/build_alpha.py', 'tools/verify_alpha_candidate.py', 'tools/verify_windows_install.py', 'tools/verify_install_flow.py', 'tools/verify_brand_migration.py',
     'tools/bash_error_cases.py', 'tools/hook_shape_probe.py',
     'tools/probe_hook_schema.py', 'tools/probe_result_api.py', 'tools/trace_hook_entry.py',
     'tools/verify_acceptance.py', 'tools/verify_bash_coverage.py',
@@ -45,8 +45,9 @@ TEST_HELPERS = (
 )
 REQUIRED_FILES = (
     PLUGIN + '.codex-plugin/plugin.json', PLUGIN + '.mcp.json',
-    PLUGIN + 'hooks/hooks.json', PLUGIN + 'skills/tas-notes-review/SKILL.md',
-    '.agents/plugins/marketplace.json', 'release/ALPHA-GUIDE.md', 'install.ps1',
+    PLUGIN + 'hooks/hooks.json', PLUGIN + 'skills/blackbox-review/SKILL.md',
+    '.agents/plugins/marketplace.json', 'release/ALPHA-GUIDE.md', 'release/INSTALL.md', 'install.ps1',
+    PLUGIN + 'skills/setup/SKILL.md',
 ) + tuple(PLUGIN + 'scripts/' + name for name in SCRIPT_NAMES) + tuple(
     PLUGIN + 'assets/' + name for name in ASSET_NAMES) + TEST_HELPERS
 ALLOWED_GLOBS = (

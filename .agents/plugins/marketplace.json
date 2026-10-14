@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "tas-notes",
+      "name": "blackbox",
       "source": {
         "source": "local",
-        "path": "./plugins/tas-notes"
+        "path": "./plugins/blackbox"
       },
       "policy": {
         "installation": "AVAILABLE",

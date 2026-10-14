@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
-const source=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/anomalies.js'),'utf8');
-const html=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/anomalies.html'),'utf8');
+const source=fs.readFileSync(path.join(__dirname,'../plugins/blackbox/assets/anomalies.js'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../plugins/blackbox/assets/anomalies.html'),'utf8');
 test('filter replacement waits for matching totals before committing cards and status',async()=>{
  const h=harness();h.run("selectedSession={id:'A'}");
  h.context.fetch=async url=>ok(url.includes('anomaly-types')?{types:[{name:'Error',count:4}]}:{items:[row(1)],snapshot_seq:10,next_before:2,total_count:4});
@@ -656,9 +656,9 @@ test('formal UI removes old navigation while keeping disclosures and scoped hist
   assert.match(html,/<details id="help"[\s\S]*?不仅限于报错的调用/);
   assert.match(html,/<section id="list-view"/);assert.match(html,/<section id="detail-view"[^>]*hidden/);
   assert.match(html,/id="record-heading" tabindex="-1"/);assert.match(html,/id="list-heading" tabindex="-1"/);
-  const historyHtml=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/review.html'),'utf8');
+  const historyHtml=fs.readFileSync(path.join(__dirname,'../plugins/blackbox/assets/review.html'),'utf8');
   assert.doesNotMatch(historyHtml,/<body[^>]*class="[^"]*anomaly-app/);
-  const css=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/review.css'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../plugins/blackbox/assets/review.css'),'utf8');
   const additions=css.slice(css.indexOf('/* NOTES-030:'));
   assert.ok(additions.length>0);assert.match(additions,/\.anomaly-app main\{/);
   for(const match of additions.replace(/\/\*[\s\S]*?\*\//g,'').matchAll(/([^{}]+)\{/g)) {
@@ -1670,4 +1670,31 @@ test('date cleanup preview uses inclusive local dates and only relevant version 
  assert.match(text,/2026-10-01 起，截至 2026-10-13（含当天）/);assert.doesNotMatch(text,/历史版本|不含/);
  versions=2;await h.run(command);text=h.get('cleanup-summary').children.map(x=>x.textContent).join(' ');assert.match(text,/删除历史版本 2 个/);assert.doesNotMatch(text,/可能仍含/);
  retained=1;await h.run(command);text=h.get('cleanup-summary').children.map(x=>x.textContent).join(' ');assert.match(text,/可能仍含/);
+});
+
+
+test('completed cleanup closes modal and reports result in the underlying drawer',async()=>{
+ const h=harness();h.get('help').open=true;
+ h.run("showCleanup();cleanupPlan={token:'done',scope:{action:'session'},can_apply:true};refreshAfterCleanup=async()=>[]");
+ h.context.fetch=async()=>ok({token:'done',reclaimed:true,events:3,freed_capacity_bytes:1024,database_bytes:4096});
+ await h.run('applyCleanup()');assert.equal(h.get('cleanup-dialog').hidden,true);assert.equal(h.get('help').inert,false);
+ assert.match(h.get('help-action-status').textContent,/已删除 3 条事件/);
+});
+test('cleanup failure or pending reclamation keeps the retry dialog open',async()=>{
+ for(const pending of [true,false]){
+  const h=harness();h.run("showCleanup();cleanupPlan={token:'done',scope:{action:'session'},can_apply:true};refreshAfterCleanup=async()=>[]");
+  h.context.fetch=async()=>{if(!pending)throw Error('offline');return ok({token:'done',reclaimed:false,events:3});};
+  await h.run('applyCleanup()');assert.equal(h.get('cleanup-dialog').hidden,false);assert.equal(h.get('cleanup-retry').hidden,false);
+ }
+});
+
+
+test('untrusted Hook replaces waiting state and clears after trust refresh',async()=>{
+ const h=harness();
+ h.run("contextsReady=true;contextsEmpty=true;selectedProject='A';workspaceHasAnomalies=false;onboardingStatus={projects:[{path:'A',enabled:true,event_count:0,capture_state:'hooks_untrusted'}]};syncOnboarding()");
+ assert.equal(h.get('onboarding-title').textContent,'采集状态需要检查');
+ assert.match(h.get('onboarding-description').textContent,/尚未信任/);
+ assert.match(h.get('onboarding-description').textContent,/hooks/);
+ h.run("onboardingStatus.projects[0].capture_state='waiting_first_event';syncOnboarding()");
+ assert.equal(h.get('onboarding-title').textContent,'已启用，等待首条记录');
 });

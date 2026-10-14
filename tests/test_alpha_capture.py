@@ -10,14 +10,17 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'
+SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'
 sys.path.insert(0, str(SCRIPTS))
-import tas_notes_core as core
-from tas_notes_diagnostics import marker_name
+import blackbox_core as core
+from blackbox_diagnostics import marker_name
 
 
 class AlphaCaptureTests(unittest.TestCase):
     def setUp(self):
+        trust = patch("blackbox_hooks.inspect", side_effect=lambda paths: {p: "trusted" for p in paths})
+        trust.start()
+        self.addCleanup(trust.stop)
         self.temporary = tempfile.TemporaryDirectory(prefix='blackbox-alpha-capture-')
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)

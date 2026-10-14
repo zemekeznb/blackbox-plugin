@@ -7,12 +7,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'
+SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'
 sys.path.insert(0, str(SCRIPTS))
-from tas_notes_core import CaptureLimit, MAX_INPUT, NotesError, Store
-from tas_notes_backup import backup, restore
-import tas_notes_anomalies as anomalies
-from tas_notes_diagnostics import unscoped_error
+from blackbox_core import CaptureLimit, MAX_INPUT, NotesError, Store
+from blackbox_backup import backup, restore
+import blackbox_anomalies as anomalies
+from blackbox_diagnostics import unscoped_error
 
 
 class BackupPathTests(unittest.TestCase):
@@ -32,8 +32,8 @@ class BackupPathTests(unittest.TestCase):
                 marker.mkdir()
             # Reproduce a reviewer copied under AppData, away from its source
             # checkout. Destination safety must not depend on __file__.
-            installed = base / 'AppData/reviewer/build/scripts/tas_notes_backup.py'
-            with patch('tas_notes_backup.__file__', str(installed)):
+            installed = base / 'AppData/reviewer/build/scripts/blackbox_backup.py'
+            with patch('blackbox_backup.__file__', str(installed)):
                 for parent in (repository, nested):
                     with self.subTest(parent=parent):
                         destination = parent / 'backup.sqlite3'
@@ -116,7 +116,7 @@ class BackupPathTests(unittest.TestCase):
             base = Path(temporary)
             original = Store(base / 'state')
             target = base / 'restored'
-            with patch('tas_notes_backup.diagnostic'):
+            with patch('blackbox_backup.diagnostic'):
                 with self.assertRaisesRegex(NotesError, 'continuity marker'):
                     restore(original.database, target)
             self.assertFalse(target.exists())

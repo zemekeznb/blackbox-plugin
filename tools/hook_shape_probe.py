@@ -27,7 +27,7 @@ def main():
             for field in ('tool_response', 'tool_result'):
                 if isinstance(payload.get(field), dict):
                     shape[field + '_fields'] = {key: type(value).__name__ for key, value in payload[field].items() if key in known}
-            path = Path(os.environ['TAS_NOTES_STATE_DIR']) / 'hook-shapes.jsonl'
+            path = Path(os.environ['BLACKBOX_STATE_DIR']) / 'hook-shapes.jsonl'
             with path.open('a', encoding='utf-8') as stream:
                 stream.write(json.dumps(shape) + '\n')
     except (ValueError, OSError, KeyError, RecursionError):

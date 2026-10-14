@@ -3,10 +3,10 @@ import unittest
 import tempfile
 from pathlib import Path
 from test_curl_errors import CMD, event
-import tas_notes_anomalies as a
+import blackbox_anomalies as a
 from test_business_errors import event as business_event, GQL, GQL_ERROR
-from tas_notes_core import Store
-from tas_notes_mcp import Reader
+from blackbox_core import Store
+from blackbox_mcp import Reader
 
 
 def response(code=502, body='<html>Unavailable</html>'):

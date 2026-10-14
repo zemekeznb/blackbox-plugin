@@ -41,7 +41,7 @@ jobs:
       - name: Isolate candidate and fallback recording paths
         run: |
           @(
-            'TAS_NOTES_STATE_DIR=' + (Join-Path $env:RUNNER_TEMP 'blackbox-ci-unused-state')
+            'BLACKBOX_STATE_DIR=' + (Join-Path $env:RUNNER_TEMP 'blackbox-ci-unused-state')
             'BLACKBOX_CANDIDATE_DIR=' + (Join-Path $env:RUNNER_TEMP 'blackbox-candidate')
             'BLACKBOX_UNPACK_DIR=' + (Join-Path $env:RUNNER_TEMP 'Blackbox candidate 中文')
           ) | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append

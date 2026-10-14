@@ -12,11 +12,11 @@ import unittest
 from unittest.mock import patch
 from urllib.parse import urlencode
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store, NotesError, MAX_FIELD
-import tas_notes_anomalies as a
-import tas_notes_core as core
-from tas_notes_web import make_server
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store, NotesError, MAX_FIELD
+import blackbox_anomalies as a
+import blackbox_core as core
+from blackbox_web import make_server
 
 TRACE = 'Traceback (most recent call last):\n  File "example.py", line 1, in <module>\nFileNotFoundError: absent\n'
 PS = "ResourceUnavailable: \nLine |\n   2 | command\n     | Program 'python.exe' failed to run: access denied\n"

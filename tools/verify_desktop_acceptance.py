@@ -23,9 +23,9 @@ def main():
     parser.add_argument('--through', type=int)
     args = parser.parse_args()
     sys.path.insert(0, str(args.plugin_root.resolve(strict=True) / 'scripts'))
-    from tas_notes_core import Store
-    from tas_notes_launcher import build_id, release_version
-    import tas_notes_anomalies as anomalies
+    from blackbox_core import Store
+    from blackbox_launcher import build_id, release_version
+    import blackbox_anomalies as anomalies
     from verify_acceptance import output_matches
 
     store = Store(args.state_dir)

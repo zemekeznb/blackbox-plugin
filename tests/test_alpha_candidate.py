@@ -9,15 +9,36 @@ import tempfile
 import unittest
 import warnings
 import zipfile
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from verify_alpha_candidate import VerificationError, extract_verified, main, verify_archive
+from verify_alpha_candidate import smoke_directory
+
+
+class SmokeCleanupTests(unittest.TestCase):
+    def test_windows_directory_lock_retries_after_shutdown(self):
+        directory = Mock(name='owned-temp')
+        directory.name = 'owned-temp'
+        directory.cleanup.side_effect = [PermissionError('still exiting'), None]
+        with patch('verify_alpha_candidate.tempfile.TemporaryDirectory', return_value=directory), patch('verify_alpha_candidate.time.sleep'):
+            with smoke_directory() as path:
+                self.assertEqual(path, 'owned-temp')
+        self.assertEqual(directory.cleanup.call_count, 2)
+
+    def test_persistent_lock_is_not_reported_as_success(self):
+        directory = Mock()
+        directory.cleanup.side_effect = PermissionError('locked')
+        with patch('verify_alpha_candidate.tempfile.TemporaryDirectory', return_value=directory), patch('verify_alpha_candidate.time.sleep'):
+            with self.assertRaises(PermissionError):
+                with smoke_directory():
+                    pass
+        self.assertEqual(directory.cleanup.call_count, 30)
 
 
 class CandidateVerificationTests(unittest.TestCase):
     def package(self, payload=None, *, change=None, mode=None):
-        payload = dict(payload or {'plugins/tas-notes/scripts/example.py': b'print("example")\n'})
+        payload = dict(payload or {'plugins/blackbox/scripts/example.py': b'print("example")\n'})
         manifest = {'schema_version': 1, 'version': '0.4.0-alpha.1',
                     'source': {'commit': 'a' * 40, 'dirty': True},
                     'files': {name: {'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)}
@@ -74,7 +95,7 @@ class CandidateVerificationTests(unittest.TestCase):
 
     def test_corrupt_payload_and_extra_unlisted_file_rejected(self):
         cases = (
-            lambda files: files.update({'plugins/tas-notes/scripts/example.py': b'corrupt'}),
+            lambda files: files.update({'plugins/blackbox/scripts/example.py': b'corrupt'}),
             lambda files: files.update({'unlisted.py': b'extra'}),
             lambda files: files.update({'SHA256SUMS': files['SHA256SUMS'].replace(b'a', b'b', 1)}),
         )

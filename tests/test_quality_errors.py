@@ -4,7 +4,7 @@ import test_anomalies as fixtures
 from test_anomalies import TRACE, PS
 from test_shell_errors import PS as PS_EXAMPLE, NODE, GIT
 from test_curl_errors import CMD, event
-import tas_notes_anomalies as a
+import blackbox_anomalies as a
 
 
 class QualityDetection(unittest.TestCase):

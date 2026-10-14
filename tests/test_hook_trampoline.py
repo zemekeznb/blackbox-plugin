@@ -14,7 +14,7 @@ class HookTrampolineTests(unittest.TestCase):
             root = Path(temp)
             target = root / 'target.py'
             target.write_text('import sys\nsys.stdout.buffer.write(sys.stdin.buffer.read())\nsys.exit(7)\n')
-            env = dict(os.environ, TAS_NOTES_STATE_DIR=temp, LOCALAPPDATA=temp)
+            env = dict(os.environ, BLACKBOX_STATE_DIR=temp, LOCALAPPDATA=temp)
             for raw in (b'{"secret":"PRIVATE_SENTINEL"}\r\n', b'\xffinvalid-json\x00'):
                 result = subprocess.run([sys.executable, str(wrapper), str(target)],
                                         input=raw, capture_output=True, env=env, timeout=12)

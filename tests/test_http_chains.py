@@ -3,7 +3,7 @@ import unittest
 from test_curl_errors import CMD, event
 from test_http_errors import response
 from test_business_errors import event as business_event
-import tas_notes_anomalies as a
+import blackbox_anomalies as a
 
 DIAG = 'curl: (22) The requested URL returned error: 502'
 REDIRECT = 'HTTP/1.1 302 Found\r\nLocation: /final\r\nContent-Length: 99\r\n\r\n'

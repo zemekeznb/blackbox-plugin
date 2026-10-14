@@ -9,12 +9,12 @@ import threading
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store, NotesError, Conflict, CaptureLimit, normalize, canonical, MAX_FIELD
-from tas_notes_backup import backup, restore, verify
-from tas_notes_diagnostics import last_error
-import tas_notes_anomalies as anomalies
-import tas_notes_core as core
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store, NotesError, Conflict, CaptureLimit, normalize, canonical, MAX_FIELD
+from blackbox_backup import backup, restore, verify
+from blackbox_diagnostics import last_error
+import blackbox_anomalies as anomalies
+import blackbox_core as core
 
 TRACE = 'Traceback (most recent call last):\n  File "x.py", line 1, in <module>\nTypeError: bad type\n'
 
@@ -72,7 +72,7 @@ class ReliabilityTests(unittest.TestCase):
 
     def test_session_limit_reserves_errors_and_marks_gap_in_next_source(self):
         self.store.record(self.event(tool_response='normal'))
-        with patch('tas_notes_core.MAX_SESSION_BYTES', 1):
+        with patch('blackbox_core.MAX_SESSION_BYTES', 1):
             with self.assertRaises(CaptureLimit):
                 self.store.record(self.event(event_id='two', hook_event_name='UserPromptSubmit', prompt='new task'))
             result=self.store.record(self.event(event_id='three'))
@@ -161,7 +161,7 @@ class ReliabilityTests(unittest.TestCase):
 
     def test_full_database_is_readable_and_disabled_project_is_ignored(self):
         self.store.record(self.event())
-        with patch('tas_notes_core.MAX_DATABASE_BYTES',1):
+        with patch('blackbox_core.MAX_DATABASE_BYTES',1):
             with self.assertRaises(CaptureLimit): self.store.record(self.event(event_id='two'))
             self.assertTrue(self.store.status()['storage']['capacity_reached'])
             self.assertEqual(len(anomalies.listing(self.store)['items']),1)

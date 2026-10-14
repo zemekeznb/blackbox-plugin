@@ -7,9 +7,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-from tas_notes_capture_probe import CaptureProbe, TOOL
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
+from blackbox_capture_probe import CaptureProbe, TOOL
 
 
 class CaptureProbeTests(unittest.TestCase):

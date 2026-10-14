@@ -2,7 +2,7 @@ import unittest
 import json
 from test_business_errors import command, GQL
 from test_curl_errors import event
-import tas_notes_anomalies as a
+import blackbox_anomalies as a
 
 def stream(result, ending='event: complete\ndata: \n\n'):
     return ('HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n'

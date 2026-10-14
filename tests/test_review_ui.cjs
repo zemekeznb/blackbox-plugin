@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '../plugins/tas-notes/assets/review.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../plugins/blackbox/assets/review.js'), 'utf8');
 function harness(filePreview=false) {
   const elements = new Map(), downloads = [], blobs = [];
   function node(tag='div') {
@@ -52,7 +52,7 @@ test('every historical revision remains readable and exportable without a write 
   assert.deepEqual(h.downloads,['investigation-a-v1.md']);
   h.run("selectRevision('')");assert.equal(h.get('export').disabled,true);
   assert.equal(h.run('typeof save'),'undefined');assert.equal(posts,0);
-  const html=fs.readFileSync(path.join(__dirname,'../plugins/tas-notes/assets/review.html'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../plugins/blackbox/assets/review.html'),'utf8');
   assert.doesNotMatch(html,/<textarea|id="save"|id="summary-request"|id="editor"/);
   assert.doesNotMatch(source,/api\/revisions|api\/summar|beforeunload/);
 });

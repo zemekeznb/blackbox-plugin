@@ -53,9 +53,9 @@ def main():
     args = parser.parse_args()
     plugin = args.plugin_root.resolve(strict=True)
     sys.path.insert(0, str(plugin / 'scripts'))
-    from tas_notes_core import Store
-    from tas_notes_launcher import build_id, release_version
-    import tas_notes_anomalies as anomalies
+    from blackbox_core import Store
+    from blackbox_launcher import build_id, release_version
+    import blackbox_anomalies as anomalies
     from verify_live_codex import Rpc
 
     root = Path(tempfile.mkdtemp(prefix='blackbox-acceptance-')).resolve()
@@ -72,7 +72,7 @@ def main():
         controls[name] = {'exit_code': result.returncode,
                           'stdout_bytes': len(result.stdout), 'stderr_bytes': len(result.stderr),
                           'expected_output': output_matches(name, (result.stdout + result.stderr).decode('utf-8', errors='replace'))}
-    cli = plugin / 'scripts/tas_notes.py'
+    cli = plugin / 'scripts/blackbox.py'
     subprocess.run([sys.executable, str(cli), '--state-dir', str(state), 'configure-runtime'],
                    check=True, capture_output=True)
     store = Store(state)
@@ -86,14 +86,14 @@ def main():
     print(json.dumps({'test_root': str(root)}, ensure_ascii=True), flush=True)
     rpc = None
     try:
-        rpc = Rpc(dict(os.environ, TAS_NOTES_STATE_DIR=str(state)), enable_hooks=False,
+        rpc = Rpc(dict(os.environ, BLACKBOX_STATE_DIR=str(state)), enable_hooks=False,
                   capture_synthetic_output=True)
         rpc.request('initialize', {'clientInfo': {'name': 'blackbox-acceptance', 'version': '0.1'},
                                   'capabilities': {'experimentalApi': True}})
         rpc.send({'method': 'initialized'})
         hooks = rpc.request('hooks/list', {'cwds': [str(project)]})
         selected = [h for entry in hooks['data'] for h in entry.get('hooks', [])
-                    if h.get('pluginId') == 'tas-notes@personal']
+                    if h.get('pluginId') == 'blackbox@personal']
         report['hooks_config'] = [{k: h.get(k) for k in ('eventName','trustStatus','enabled','timeoutSec')}
                                   for h in selected]
         if len(selected) != 8 or any(h.get('trustStatus') != 'trusted' or not h.get('enabled') for h in selected):

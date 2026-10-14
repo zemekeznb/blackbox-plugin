@@ -1,7 +1,7 @@
 import unittest
 from test_curl_errors import CMD,event
-import tas_notes_anomalies as a
-from tas_notes_transport_errors import CERT_HELP
+import blackbox_anomalies as a
+from blackbox_transport_errors import CERT_HELP
 
 CASES=[('curl: (35) schannel: next InitializeSecurityContext failed: SEC_E_INVALID_TOKEN (0x80090308) - bad token','curl-tls'),
  ('curl: (60) schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - untrusted root','curl-certificate'),

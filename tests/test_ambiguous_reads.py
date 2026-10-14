@@ -2,8 +2,8 @@ import unittest
 from test_anomalies import TRACE, PS as START_ERROR
 from test_shell_errors import PS as LOGGED_ERROR
 from test_curl_errors import event
-import tas_notes_anomalies as a
-from tas_notes_shell_errors import content_read_path, literal_content_read
+import blackbox_anomalies as a
+from blackbox_shell_errors import content_read_path, literal_content_read
 
 
 class AmbiguousReads(unittest.TestCase):

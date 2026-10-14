@@ -10,9 +10,9 @@ from pathlib import Path
 import sys
 import tempfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-import tas_notes_anomalies as anomalies
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
+import blackbox_anomalies as anomalies
 
 FIXTURES = {
     'connection': '''import socket

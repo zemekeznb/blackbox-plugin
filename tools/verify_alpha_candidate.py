@@ -7,6 +7,7 @@ It never enables a project or claims that Codex delivered an actual Hook.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import http.client
 import json
@@ -17,6 +18,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import urlsplit
 import zipfile
 
@@ -25,7 +27,7 @@ MAX_FILES = 2000
 MAX_FILE_BYTES = 32 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 METADATA = {'release-manifest.json', 'SHA256SUMS'}
-PLUGIN = 'plugins/tas-notes/'
+PLUGIN = 'plugins/blackbox/'
 HASH = re.compile(r'[a-f0-9]{64}\Z')
 VERSION = re.compile(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\Z')
 RESERVED = re.compile(r'(?i)(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?\Z')
@@ -159,15 +161,33 @@ def extract_verified(files, destination):
             stream.write(data)
 
 
+@contextmanager
+def smoke_directory():
+    temporary = tempfile.TemporaryDirectory(prefix='blackbox-alpha-')
+    try:
+        yield temporary.name
+    finally:
+        # HTTP shutdown can finish before Windows releases the service's cwd.
+        # Retry only this owned temporary directory; persistent failure surfaces.
+        for attempt in range(30):
+            try:
+                temporary.cleanup()
+                break
+            except PermissionError:
+                if attempt == 29:
+                    raise
+                time.sleep(0.1)
+
+
 def smoke_test(manifest, files):
-    if PLUGIN + 'scripts/tas_notes.py' not in files:
+    if PLUGIN + 'scripts/blackbox.py' not in files:
         raise VerificationError('Candidate does not contain the expected Blackbox entry point.')
-    with tempfile.TemporaryDirectory(prefix='blackbox-alpha-') as temporary:
+    with smoke_directory() as temporary:
         root = Path(temporary)
         package, state = root / '候选 插件 with spaces', root / '隔离 状态'
         extract_verified(files, package)
-        entry = package / PLUGIN / 'scripts/tas_notes.py'
-        environment = dict(os.environ, TAS_NOTES_STATE_DIR=str(state), PYTHONDONTWRITEBYTECODE='1')
+        entry = package / PLUGIN / 'scripts/blackbox.py'
+        environment = dict(os.environ, BLACKBOX_STATE_DIR=str(state), PYTHONDONTWRITEBYTECODE='1')
         environment.pop('PYTHONPATH', None)
         environment.pop('PYTHONHOME', None)
 
@@ -226,7 +246,7 @@ def smoke_test(manifest, files):
                     raise VerificationError('Reader authenticated health check failed.')
                 health = read_json(body)
                 if (not isinstance(health, dict) or health.get('version') != manifest['version']
-                        or health.get('service') != 'tas-notes-review'
+                        or health.get('service') != 'blackbox-review'
                         or Path(health.get('state_dir', '')).resolve() != state.resolve()):
                     raise VerificationError('Reader version or isolated state does not match the candidate.')
                 connection.request('GET', '/', headers=headers)

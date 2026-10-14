@@ -24,7 +24,7 @@ class AlphaPackageTests(unittest.TestCase):
         for name in alpha.REQUIRED_FILES:
             self.put(name, b'# synthetic fixture\n')
         self.put(alpha.PLUGIN + '.codex-plugin/plugin.json',
-                 json.dumps({'name': 'tas-notes', 'version': '0.4.0-alpha.1'}).encode())
+                 json.dumps({'name': 'blackbox', 'version': '0.4.0-alpha.1'}).encode())
         self.put('tests/test_example.py', b'import unittest\n')
         self.original_identity = alpha.source_identity
         self.identity = patch.object(alpha, 'source_identity', return_value={
@@ -71,10 +71,10 @@ class AlphaPackageTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(bundle.read(name)).hexdigest(), digest)
 
     def test_no_runtime_data_or_arbitrary_tools(self):
-        excluded = ('.local/notes.db', '.codex/config.toml', 'plugins/tas-notes/data.sqlite',
-                    'plugins/tas-notes/scripts/__pycache__/core.pyc', 'docs/private.md',
+        excluded = ('.local/notes.db', '.codex/config.toml', 'plugins/blackbox/data.sqlite',
+                    'plugins/blackbox/scripts/__pycache__/core.pyc', 'docs/private.md',
                     'tools/cleanup_notes025.py', '.env', 'run.log', 'dist/old.zip',
-                    'plugins/tas-notes/assets/notes.db')
+                    'plugins/blackbox/assets/notes.db')
         for name in excluded:
             self.put(name, b'PRIVATE RUNTIME FIXTURE')
         with zipfile.ZipFile(self.build()['archive']) as bundle:
@@ -90,12 +90,12 @@ class AlphaPackageTests(unittest.TestCase):
 
     def test_changed_source_changes_manifest_and_archive(self):
         first = self.build()
-        self.put(alpha.PLUGIN + 'scripts/tas_notes.py', b'# different synthetic source\n')
+        self.put(alpha.PLUGIN + 'scripts/blackbox.py', b'# different synthetic source\n')
         second = self.build()
         self.assertNotEqual(first['sha256'], second['sha256'])
         with zipfile.ZipFile(second['archive']) as bundle:
             manifest = json.loads(bundle.read('release-manifest.json'))
-            entry = manifest['files'][alpha.PLUGIN + 'scripts/tas_notes.py']
+            entry = manifest['files'][alpha.PLUGIN + 'scripts/blackbox.py']
             self.assertEqual(hashlib.sha256(b'# different synthetic source\n').hexdigest(), entry['sha256'])
 
     def test_runtime_secrets_not_read_but_payload_secrets_rejected(self):
@@ -127,7 +127,7 @@ class AlphaPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(alpha.BuildError, 'Symlink or reparse point'):
             self.build()
         link.unlink()
-        link.symlink_to(self.root / (alpha.PLUGIN + 'scripts/tas_notes.py'))
+        link.symlink_to(self.root / (alpha.PLUGIN + 'scripts/blackbox.py'))
         with self.assertRaisesRegex(alpha.BuildError, 'Symlink or reparse point'):
             self.build()
 

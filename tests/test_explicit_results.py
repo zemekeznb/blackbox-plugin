@@ -2,8 +2,8 @@ import unittest
 import json
 from test_curl_errors import event
 from test_anomalies import TRACE
-import tas_notes_anomalies as a
-from tas_notes_curl_result import FORMAT, MARKER
+import blackbox_anomalies as a
+from blackbox_curl_result import FORMAT, MARKER
 
 URL='http://127.0.0.1:12345/test'
 CMD="curl.exe -q -sS --stderr - -i --write-out '"+FORMAT+"' '"+URL+"'"

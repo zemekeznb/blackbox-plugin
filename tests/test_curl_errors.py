@@ -3,10 +3,10 @@ import sys
 from pathlib import Path
 import tempfile
 import unittest
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-import tas_notes_anomalies as a
-from tas_notes_core import Store
-from tas_notes_mcp import Reader
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+import blackbox_anomalies as a
+from blackbox_core import Store
+from blackbox_mcp import Reader
 
 CMD = "& 'C:/Windows/system32/curl.exe' -q -sS -i --max-time 2 --noproxy '*' http://127.0.0.1:9/; exit $LASTEXITCODE"
 ERROR = 'curl: (7) Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server\r\n'

@@ -11,11 +11,11 @@ import threading
 import unittest
 from unittest.mock import patch
 
-SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'
+SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'
 sys.path.insert(0, str(SCRIPTS))
-import tas_notes_core as core
-import tas_notes_anomalies as anomalies
-from tas_notes_web import make_server
+import blackbox_core as core
+import blackbox_anomalies as anomalies
+from blackbox_web import make_server
 
 TRACE = ('Traceback (most recent call last):\n'
          '  File "synthetic_lifecycle.py", line 1, in <module>\n'
@@ -30,11 +30,11 @@ class AlphaLifecycleTests(unittest.TestCase):
         self.state = self.root / 'state'
         self.project = self.root / 'synthetic-project'
         self.project.mkdir()
-        self.env = dict(os.environ, TAS_NOTES_STATE_DIR=str(self.state),
+        self.env = dict(os.environ, BLACKBOX_STATE_DIR=str(self.state),
                         LOCALAPPDATA=str(self.root / 'appdata'), CODEX_HOME=str(self.root / 'codex'))
 
     def cli(self, *arguments, state=None, payload=None, expected=0):
-        result = subprocess.run([sys.executable, str(SCRIPTS / 'tas_notes.py'),
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'blackbox.py'),
                                  '--state-dir', str(state or self.state), *arguments],
                                 input=json.dumps(payload) if payload is not None else None,
                                 capture_output=True, text=True, encoding='utf-8',
@@ -52,8 +52,8 @@ class AlphaLifecycleTests(unittest.TestCase):
         result = self.cli('enable', str(self.project), '--accept-capture-scope', state=state)
         self.assertTrue(result['enabled'])
         # Synthetic lifecycle fixture: simulate metadata verification, not host capture.
-        from tas_notes_admission import admit
-        with patch('tas_notes_admission.lookup', return_value='allowed'):
+        from blackbox_admission import admit
+        with patch('blackbox_admission.lookup', return_value='allowed'):
             admit(core.Store(state or self.state), self.event('fixture-admission'))
 
     def export_anomaly(self, store, identifier, snapshot):

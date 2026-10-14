@@ -9,7 +9,7 @@ codex plugin marketplace add './tools/entry-probe' --json
 codex plugin add blackbox-entry-probe@blackbox-lab --json
 ```
 
-The registered marketplace remains local. This does not update tas-notes or its hooks. No secrets or runtime data belong here.
+The registered marketplace remains local. This does not update blackbox or its hooks. No secrets or runtime data belong here.
 
 Validation:
 

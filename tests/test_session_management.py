@@ -6,13 +6,13 @@ import tempfile
 import threading
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store, NotesError
-from tas_notes_sessions import inspect_session, manage_session
-from tas_notes_anomalies import contexts, listing, anomaly_types, detail
-from tas_notes_mcp import Reader, TOOLS
-from tas_notes_backup import backup, restore
-from tas_notes_web import make_server
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store, NotesError
+from blackbox_sessions import inspect_session, manage_session
+from blackbox_anomalies import contexts, listing, anomaly_types, detail
+from blackbox_mcp import Reader, TOOLS
+from blackbox_backup import backup, restore
+from blackbox_web import make_server
 
 
 class SessionManagementTests(unittest.TestCase):

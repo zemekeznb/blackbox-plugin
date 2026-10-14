@@ -5,12 +5,12 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-import tas_notes_anomalies as a
-from tas_notes_business_errors import strict_json
-from tas_notes_core import Store
-from tas_notes_mcp import Reader
+import blackbox_anomalies as a
+from blackbox_business_errors import strict_json
+from blackbox_core import Store
+from blackbox_mcp import Reader
 from verify_shell_formats import audit
 from verify_shell_installation import control_text
 

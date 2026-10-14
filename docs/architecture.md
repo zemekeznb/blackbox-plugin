@@ -1,5 +1,7 @@
 # Blackbox Plugin 系统架构
 
+2026-10-14 NOTES-121 / ADR-N006：当前源码入口统一为 plugins/blackbox/scripts/blackbox.py，技能 blackbox-review，插件 blackbox@personal。新默认数据目录 Blackbox；旧环境变量、路径别名及服务协议作为兼容输入保留。下方旧版本说明中的命名属于历史实现；迁移边界见 [ADR-N006](decisions/ADR-N006-blackbox-identity.md)。
+
 NOTES-099 / 0.4.0-alpha.6.24：生产 Hook 增加宿主 source/ephemeral 身份准入及有界元数据缓存；仅接收已启用项目中持久交互用户会话（含归档），未知正文不落盘。用户明确授权固定隐藏历史清理；不自动过期。详见 [报告](reports/NOTES-099-session-admission.md)。
 
 当前进度以 NOTES-066 证据自审为准：HTTP 前置诊断已按用户要求暂停，属于未证实的排列假设，不再列为必做缺口。真实故障、协议夹具、外部依据与人工反例分别统计；产品仍为 0.3.38，无本轮安装。见 [审计](reports/NOTES-066-evidence-audit.md)。以下版本摘要为历史记录，不自动生成待办。

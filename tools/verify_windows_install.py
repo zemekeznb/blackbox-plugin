@@ -90,7 +90,7 @@ class Harness:
     def __init__(self, root, package, powershell, system_path):
         self.root, self.package = root, package
         self.powershell, self.system_path = powershell, system_path
-        self.entry = package / 'plugins/tas-notes/scripts/tas_notes.py'
+        self.entry = package / 'plugins/blackbox/scripts/blackbox.py'
 
     def fixture(self, name, with_python=True):
         root = self.root / name
@@ -99,7 +99,7 @@ class Harness:
         for path in (appdata, roaming, temporary, profile / 'Desktop'):
             path.mkdir(parents=True)
         environment = dict(os.environ)
-        for name_to_remove in ('TAS_NOTES_STATE_DIR', 'PYTHONHOME', 'PYTHONPATH'):
+        for name_to_remove in ('BLACKBOX_STATE_DIR', 'TAS_NOTES_STATE_DIR', 'PYTHONHOME', 'PYTHONPATH'):
             environment.pop(name_to_remove, None)
         environment.update(LOCALAPPDATA=str(appdata), APPDATA=str(roaming),
                            USERPROFILE=str(profile), CODEX_HOME=str(root / '隔离 Codex'),
@@ -108,7 +108,7 @@ class Harness:
                            PSModulePath=str(self.powershell.parent / 'Modules'))
         if with_python:
             environment['PATH'] = str(Path(sys.executable).parent) + os.pathsep + self.system_path
-        return {'root': root, 'environment': environment, 'default_state': appdata / 'TAS Notes',
+        return {'root': root, 'environment': environment, 'default_state': appdata / 'Blackbox',
                 'custom_state': root / '指定 状态', 'commands': []}
 
     def run(self, fixture, arguments, *, input_text=None, expected=0, timeout=45):
@@ -133,7 +133,7 @@ class Harness:
         return record
 
     def install(self, fixture, *, state=None, python=None, check_only=False, expected=0):
-        command = [self.powershell, '-NoProfile', '-NonInteractive', '-File', self.package / 'install.ps1']
+        command = [self.powershell, '-NoProfile', '-NonInteractive', '-File', self.package / 'install.ps1', '-RuntimeOnly']
         if python is not None:
             command += ['-Python', python]
         if state is not None:
@@ -203,14 +203,14 @@ def exercise(harness, receipt):
 
     def first_default(fixture, result):
         command = harness.install(fixture)
-        require('have NOT been verified' in command['stdout'], 'Installer did not distinguish host verification.')
+        require('pending verification' in command['stdout'], 'Installer did not distinguish host verification.')
         result['database'] = harness.empty_state(fixture['default_state'])
         result['boundaries'] = harness.boundaries(fixture)
         require(not fixture['custom_state'].exists(), 'Default install touched custom state.')
 
     def first_custom(fixture, result):
         command = harness.install(fixture, state=fixture['custom_state'], python=sys.executable)
-        require('TAS_NOTES_STATE_DIR' in command['stdout'], 'Custom state inheritance warning is missing.')
+        require('BLACKBOX_STATE_DIR' in command['stdout'], 'Custom state inheritance warning is missing.')
         result['database'] = harness.empty_state(fixture['custom_state'])
         result['boundaries'] = harness.boundaries(fixture)
         require(not fixture['default_state'].exists(), 'Custom install touched default state.')
@@ -250,7 +250,14 @@ def exercise(harness, receipt):
         harness.cli(fixture, state, 'enable', enabled, '--accept-capture-scope')
         harness.cli(fixture, state, 'enable', disabled, '--accept-capture-scope')
         harness.cli(fixture, state, 'disable', disabled)
-        harness.cli(fixture, state, 'hook', payload=payload(enabled, 'recorded-synthetic-fixture'))
+        # Seed synthetic history directly: current production Hook requires a
+        # real host-confirmed session and must reject this invented identity.
+        seed = ('import sys,json; sys.path.insert(0,sys.argv[1]); '
+                'from blackbox_core import Store; '
+                'Store(sys.argv[2]).record(json.loads(sys.stdin.read()))')
+        harness.run(fixture, [sys.executable, '-B', '-c', seed,
+                             harness.package / 'plugins/blackbox/scripts', state],
+                    input_text=json.dumps(payload(enabled, 'recorded-synthetic-fixture')))
         # Legacy editing is intentionally unavailable in the current CLI. These
         # two explicitly synthetic historical rows test reinstall preservation;
         # they are fixtures, not a restored or newly produced user archive.

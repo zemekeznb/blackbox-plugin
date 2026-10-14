@@ -5,8 +5,8 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
 
 
 class HistoryTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class HistoryTests(unittest.TestCase):
             self.assertFalse(hasattr(store, 'save_summary'))
 
     def test_source_cannot_forge_generated_citations(self):
-        from tas_notes_summary import readable
+        from blackbox_summary import readable
         record = {'events':[{'seq':1,'kind':'UserPromptSubmit','content':json.dumps({'prompt':'# 标题 [来源 #999]'})}]}
         body = readable(record)
         self.assertNotIn('[来源 #999]', body)

@@ -13,11 +13,11 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / 'plugins/tas-notes/scripts'
+SCRIPTS = ROOT / 'plugins/blackbox/scripts'
 sys.path.insert(0, str(SCRIPTS))
-from tas_notes_core import Store, NotesError, Conflict, normalize, MAX_INPUT, MAX_FIELD
+from blackbox_core import Store, NotesError, Conflict, normalize, MAX_INPUT, MAX_FIELD
 from uuid import uuid4
-from tas_notes_web import make_server
+from blackbox_web import make_server
 
 
 def legacy_revision(store, identifier, title, body, seq, number=1):
@@ -30,7 +30,7 @@ def legacy_revision(store, identifier, title, body, seq, number=1):
 
 class StoreTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix='tas-notes-')
+        self.temporary = tempfile.TemporaryDirectory(prefix='blackbox-')
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.project = self.root / '项目 with spaces'
@@ -205,7 +205,7 @@ class StoreTests(unittest.TestCase):
         raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         result = subprocess.run([sys.executable, str(ROOT / 'tools/hook_shape_probe.py'), str(receiver)],
             input=raw, capture_output=True, timeout=10,
-            env=dict(os.environ, TAS_NOTES_STATE_DIR=str(self.store.directory)))
+            env=dict(os.environ, BLACKBOX_STATE_DIR=str(self.store.directory)))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(target.read_bytes(), raw)
         metadata = (self.store.directory / 'hook-shapes.jsonl').read_text(encoding='utf-8')
@@ -244,19 +244,19 @@ class StoreTests(unittest.TestCase):
             self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 42)
 
     def test_capacity_failure_rolls_back_new_session(self):
-        with patch('tas_notes_core.MAX_SESSION_BYTES', 1):
+        with patch('blackbox_core.MAX_SESSION_BYTES', 1):
             with self.assertRaises(NotesError):
                 self.store.record(self.event())
         self.assertEqual(self.store.listing(), [])
 
     def cli(self, *args, data=None):
-        return subprocess.run([sys.executable, str(SCRIPTS / 'tas_notes.py'), '--state-dir',
+        return subprocess.run([sys.executable, str(SCRIPTS / 'blackbox.py'), '--state-dir',
                                str(self.store.directory), *args], input=data, capture_output=True, timeout=10)
 
     def test_separate_process_persists_unicode_and_exports_without_overwrite(self):
         event = self.event(prompt='中文用户材料')
-        from tas_notes_admission import admit
-        with patch('tas_notes_admission.lookup', return_value='allowed'):
+        from blackbox_admission import admit
+        with patch('blackbox_admission.lookup', return_value='allowed'):
             admit(self.store, event)
         result = self.cli('hook', data=json.dumps(event, ensure_ascii=False).encode('utf-8'))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -280,11 +280,11 @@ class StoreTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == 'nt', 'Windows launcher')
     def test_windows_launcher_copies_raw_unicode_stdin(self):
-        from tas_notes_admission import admit
-        with patch('tas_notes_admission.lookup', return_value='allowed'):
+        from blackbox_admission import admit
+        with patch('blackbox_admission.lookup', return_value='allowed'):
             admit(self.store, self.event())
         self.assertEqual(self.cli('configure-runtime').returncode, 0)
-        environment = dict(os.environ, TAS_NOTES_STATE_DIR=str(self.store.directory))
+        environment = dict(os.environ, BLACKBOX_STATE_DIR=str(self.store.directory))
         copied = self.project / '插件 scripts'
         shutil.copytree(SCRIPTS, copied, ignore=shutil.ignore_patterns('__pycache__'))
         result = subprocess.run(['cmd.exe', '/d', '/c', str(copied / 'launch.cmd')],
@@ -299,7 +299,7 @@ class StoreTests(unittest.TestCase):
 
 class WebTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix='tas-notes-web-')
+        self.temporary = tempfile.TemporaryDirectory(prefix='blackbox-web-')
         self.addCleanup(self.temporary.cleanup)
         root = Path(self.temporary.name)
         project = root / 'project'
@@ -364,7 +364,7 @@ class WebTests(unittest.TestCase):
         self.assertIn('<script>bad()</script>', json.loads(raw)['draft'])
         self.assertIn('application/json', headers['Content-Type'])
         self.assertIn("default-src 'none'", headers['Content-Security-Policy'])
-        self.assertEqual(self.request('/../scripts/tas_notes_core.py')[0], 404)
+        self.assertEqual(self.request('/../scripts/blackbox_core.py')[0], 404)
 
     def test_page_assets_are_relative_and_served_with_correct_types(self):
         code, body, _ = self.request('/', auth=False)

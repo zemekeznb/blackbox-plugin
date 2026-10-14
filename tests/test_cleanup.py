@@ -1,12 +1,12 @@
 import sys, tempfile, unittest, sqlite3, json
 from pathlib import Path
 from unittest.mock import patch
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'plugins/tas-notes/scripts'))
-from tas_notes_core import Store, NotesError, CaptureLimit
-from tas_notes_cleanup import preview, apply, reclaim, occupied, pending
-from tas_notes_sessions import manage_session, inspect_session
-from tas_notes_anomalies import detail, listing
-from tas_notes_mcp import Reader
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'plugins/blackbox/scripts'))
+from blackbox_core import Store, NotesError, CaptureLimit
+from blackbox_cleanup import preview, apply, reclaim, occupied, pending
+from blackbox_sessions import manage_session, inspect_session
+from blackbox_anomalies import detail, listing
+from blackbox_mcp import Reader
 
 class CleanupTests(unittest.TestCase):
     def setUp(self):
@@ -73,13 +73,13 @@ class CleanupTests(unittest.TestCase):
     def test_real_space_reclaimed_and_normal_capture_restored(self):
         for _ in range(80):inv=self.emit(size=12000)['investigation']
         before=self.store.database.stat().st_size
-        with patch('tas_notes_core.MAX_DATABASE_BYTES',before):
+        with patch('blackbox_core.MAX_DATABASE_BYTES',before):
             with self.assertRaises(CaptureLimit):self.emit(error=False)
             result=self.delete(self.scope('session',investigation=inv));self.assertTrue(result['reclaimed']);self.assertLess(self.store.database.stat().st_size,before//2)
             self.assertEqual(self.emit(error=False)['status'],'recorded')
         with self.store.connect() as db:self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0],'ok')
     def test_session_bytes_recover_without_error_reserve(self):
-        with patch('tas_notes_core.MAX_SESSION_BYTES',5000):
+        with patch('blackbox_core.MAX_SESSION_BYTES',5000):
             inv=self.emit(error=False,size=3000)['investigation']
             with self.assertRaises(CaptureLimit):self.emit(error=False,size=3000)
             self.delete(self.scope('dates',investigation=inv,end='2099-01-01T00:00:00+00:00'))
@@ -139,7 +139,7 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(self.store.status()['storage']['cleanup_pending'],[])
     def test_http_cleanup_auth_and_confirmation(self):
         import http.client,threading
-        from tas_notes_web import make_server
+        from blackbox_web import make_server
         inv=self.emit()['investigation'];server,token=make_server(self.store,'test-token');thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         try:
             def request(value,auth=True,origin=None):
@@ -159,8 +159,8 @@ class CleanupTests(unittest.TestCase):
     def test_process_exit_after_commit_recovers_receipt(self):
         import subprocess
         inv=self.emit()['investigation']
-        script="import sys,os;sys.path.insert(0,sys.argv[1]);from tas_notes_core import Store;import tas_notes_cleanup as c;import json;s=Store(sys.argv[2]);q=json.loads(sys.argv[3]);p=c.preview(s,q);c.reclaim=lambda *a:os._exit(23);c.apply(s,dict(scope=p['scope'],token=p['token']))"
-        result=subprocess.run([sys.executable,'-c',script,str(Path(__file__).resolve().parents[1]/'plugins/tas-notes/scripts'),str(self.store.directory),json.dumps(self.scope('session',investigation=inv))],capture_output=True)
+        script="import sys,os;sys.path.insert(0,sys.argv[1]);from blackbox_core import Store;import blackbox_cleanup as c;import json;s=Store(sys.argv[2]);q=json.loads(sys.argv[3]);p=c.preview(s,q);c.reclaim=lambda *a:os._exit(23);c.apply(s,dict(scope=p['scope'],token=p['token']))"
+        result=subprocess.run([sys.executable,'-c',script,str(Path(__file__).resolve().parents[1]/'plugins/blackbox/scripts'),str(self.store.directory),json.dumps(self.scope('session',investigation=inv))],capture_output=True)
         self.assertEqual(result.returncode,23,result.stderr);self.assertEqual(self.rows(),[])
         with self.store.connect() as db:receipt=pending(db)[0]
         self.assertTrue(reclaim(self.store,receipt['token'])['reclaimed'])

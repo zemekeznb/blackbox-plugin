@@ -11,10 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store, NotesError
-from tas_notes_mcp import Reader, TOOLS, URI, resource_html, downloads_directory
-from tas_notes_anomalies import listing, detail, RULE_VERSION
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store, NotesError
+from blackbox_mcp import Reader, TOOLS, URI, resource_html, downloads_directory
+from blackbox_anomalies import listing, detail, RULE_VERSION
 
 
 class McpReaderTests(unittest.TestCase):
@@ -83,7 +83,7 @@ class McpReaderTests(unittest.TestCase):
 
     def test_metadata_resource_and_open_do_not_access_records(self):
         for tool in TOOLS: self.assertEqual(tool['_meta']['ui']['visibility'],['app'])
-        with patch('tas_notes_mcp.Store', side_effect=AssertionError('must not access DB')):
+        with patch('blackbox_mcp.Store', side_effect=AssertionError('must not access DB')):
             self.assertNotIn('_meta',self.reader.call('open_reader',{}))
             html=self.reader.dispatch('resources/read',{'uri':URI})['contents'][0]['text']
         self.assertIn('window.blackboxRequest',html)
@@ -92,14 +92,14 @@ class McpReaderTests(unittest.TestCase):
         self.assertIn('id="shutdown" hidden disabled',html)
         self.assertNotIn('ui/update-model-context',html)
         self.assertNotIn('ui/message',html)
-        from tas_notes_launcher import release_version
+        from blackbox_launcher import release_version
         self.assertIn("version:'" + release_version() + "'", html)
         self.assertNotIn('__BLACKBOX_VERSION__', html)
 
     def test_names_only_resolve_saved_session_ids(self):
         with patch.object(self.reader.names,'names',return_value={'x':'title'}) as call:
             self.assertEqual(self.read('/api/session-names?investigation='+self.event['investigation'])['status'],200)
-            call.assert_called_once_with({self.event['investigation']:'synthetic-session'})
+            call.assert_called_once_with({self.event['investigation']:'synthetic-session'}, refresh=True)
 
     def test_browser_export_schema_is_app_only_and_advertises_service_side_effects(self):
         descriptor = next(tool for tool in TOOLS if tool['name'] == 'open_browser_export')
@@ -122,7 +122,7 @@ class McpReaderTests(unittest.TestCase):
         before, selected = self.store.database.read_bytes(), preference.read_bytes()
         base = 'http://127.0.0.1:22266/#token=' + 'a' * 43
         args = {'record_id': snapshot['id'], 'through': snapshot['source_seq'], 'rule': snapshot['rule_version']}
-        with patch('tas_notes_mcp.ensure_reviewer', return_value={'pid': 123, 'url': base}) as launch:
+        with patch('blackbox_mcp.ensure_reviewer', return_value={'pid': 123, 'url': base}) as launch:
             result = self.reader.call('open_browser_export', args)
         launch.assert_called_once()
         readonly_store = launch.call_args.args[0]
@@ -154,7 +154,7 @@ class McpReaderTests(unittest.TestCase):
         for value in (None, True, 1, '', 'x' * 129, 'old-rule'):
             invalid.append(dict(valid, rule=value))
         before = self.store.database.read_bytes()
-        with patch('tas_notes_mcp.ensure_reviewer') as launch:
+        with patch('blackbox_mcp.ensure_reviewer') as launch:
             for args in invalid:
                 with self.subTest(args=args):
                     result = self.reader.call('open_browser_export', args)
@@ -169,7 +169,7 @@ class McpReaderTests(unittest.TestCase):
             'hook_event_name': 'PostToolUse', 'tool_name': 'Bash', 'tool_input': {'command': 'second'},
             'tool_response': 'Traceback (most recent call last):\n  File "x.py", line 1\nValueError: SECOND\n'})
         before = self.store.database.read_bytes()
-        with patch('tas_notes_mcp.ensure_reviewer') as launch:
+        with patch('blackbox_mcp.ensure_reviewer') as launch:
             for identifier, through in [('999', 3), ('2', 3), ('1', 4), ('3', 2)]:
                 with self.subTest(identifier=identifier, through=through):
                     result = self.reader.call('open_browser_export', {'record_id': identifier, 'through': through, 'rule': RULE_VERSION})
@@ -179,7 +179,7 @@ class McpReaderTests(unittest.TestCase):
 
     def test_browser_export_keeps_old_service_running_and_reports_build_mismatch_safely(self):
         error = NotesError('PRIVATE-SENTINEL'); error.public_code = 'reviewer_build_changed'
-        with patch('tas_notes_mcp.ensure_reviewer', side_effect=error), patch('tas_notes_launcher.stop_reviewer') as stop:
+        with patch('blackbox_mcp.ensure_reviewer', side_effect=error), patch('blackbox_launcher.stop_reviewer') as stop:
             result = self.reader.call('open_browser_export', {'record_id': '1', 'through': 1, 'rule': RULE_VERSION})
         stop.assert_not_called()
         self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
@@ -188,7 +188,7 @@ class McpReaderTests(unittest.TestCase):
     def test_browser_export_service_failures_and_untrusted_urls_are_not_returned(self):
         args = {'record_id': '1', 'through': 1, 'rule': RULE_VERSION}
         for error in (NotesError('PRIVATE-SENTINEL'), OSError('PRIVATE-SENTINEL')):
-            with self.subTest(error=type(error).__name__), patch('tas_notes_mcp.ensure_reviewer', side_effect=error):
+            with self.subTest(error=type(error).__name__), patch('blackbox_mcp.ensure_reviewer', side_effect=error):
                 result = self.reader.call('open_browser_export', args)
                 self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
                     'status': 503, 'body': {'error': 'reviewer_unavailable'}}}})
@@ -198,14 +198,14 @@ class McpReaderTests(unittest.TestCase):
                       {'pid': 123, 'url': 'http://127.0.0.1:22266/private#token=' + 'a' * 43},
                       {'pid': 123, 'url': 'http://127.0.0.1:22266/#token=' + 'a' * 42},
                       {'pid': True, 'url': 'http://127.0.0.1:22266/#token=' + 'a' * 43}]:
-            with self.subTest(value=value), patch('tas_notes_mcp.ensure_reviewer', return_value=value):
+            with self.subTest(value=value), patch('blackbox_mcp.ensure_reviewer', return_value=value):
                 result = self.reader.call('open_browser_export', args)
                 self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
                     'status': 503, 'body': {'error': 'reviewer_unavailable'}}}})
 
     def test_browser_export_missing_store_does_not_create_or_launch_anything(self):
         reader = Reader(self.root / 'missing'); self.addCleanup(reader.names.close)
-        with patch('tas_notes_mcp.ensure_reviewer') as launch:
+        with patch('blackbox_mcp.ensure_reviewer') as launch:
             result = reader.call('open_browser_export', {'record_id': '1', 'through': 1, 'rule': RULE_VERSION})
         launch.assert_not_called()
         self.assertEqual(result['_meta']['blackbox']['status'], 503)
@@ -235,7 +235,7 @@ class McpReaderTests(unittest.TestCase):
         preference = self.store.directory / 'reader-selection.json'
         selected = preference.read_bytes()
         destination = self.root / '重定向 下载'; destination.mkdir()
-        with patch('tas_notes_mcp.downloads_directory', return_value=destination), patch('tas_notes_mcp.ensure_reviewer') as launch:
+        with patch('blackbox_mcp.downloads_directory', return_value=destination), patch('blackbox_mcp.ensure_reviewer') as launch:
             result = self.reader.call('save_export', args)
         launch.assert_not_called()
         self.assertEqual(result['content'], [])
@@ -254,7 +254,7 @@ class McpReaderTests(unittest.TestCase):
         args, body = self.export_args()
         destination = self.root / 'downloads'; destination.mkdir()
         existing = destination / 'anomaly-1-through-1.md'; existing.write_bytes(b'KEEP ORIGINAL')
-        with patch('tas_notes_mcp.downloads_directory', return_value=destination):
+        with patch('blackbox_mcp.downloads_directory', return_value=destination):
             results = [self.reader.call('save_export', args) for _ in range(2)]
         self.assertEqual(existing.read_bytes(), b'KEEP ORIGINAL')
         self.assertEqual([r['_meta']['blackbox']['body']['name'] for r in results],
@@ -267,7 +267,7 @@ class McpReaderTests(unittest.TestCase):
         destination = self.root / 'downloads'; destination.mkdir()
         original = self.root / 'keep.txt'; original.write_bytes(b'KEEP LINK TARGET')
         linked = destination / 'anomaly-1-through-1.md'; os.link(original, linked)
-        with patch('tas_notes_mcp.downloads_directory', return_value=destination):
+        with patch('blackbox_mcp.downloads_directory', return_value=destination):
             result = self.reader.call('save_export', args)
         self.assertEqual(original.read_bytes(), b'KEEP LINK TARGET')
         self.assertEqual(linked.read_bytes(), b'KEEP LINK TARGET')
@@ -277,7 +277,7 @@ class McpReaderTests(unittest.TestCase):
     def test_save_export_concurrent_calls_create_distinct_verified_files(self):
         args, body = self.export_args()
         destination = self.root / 'downloads'; destination.mkdir()
-        with patch('tas_notes_mcp.downloads_directory', return_value=destination), ThreadPoolExecutor(2) as pool:
+        with patch('blackbox_mcp.downloads_directory', return_value=destination), ThreadPoolExecutor(2) as pool:
             results = list(pool.map(lambda _: self.reader.call('save_export', args), range(2)))
         self.assertTrue(all(result['_meta']['blackbox']['status'] == 200 for result in results))
         paths = {result['_meta']['blackbox']['body']['path'] for result in results}
@@ -287,7 +287,7 @@ class McpReaderTests(unittest.TestCase):
     def test_save_export_hash_mismatch_never_resolves_directory_or_writes(self):
         args, _ = self.export_args(); args['preview_sha256'] = '0' * 64
         before = self.store.database.read_bytes()
-        with patch('tas_notes_mcp.downloads_directory') as resolve, patch('tas_notes_mcp.save_export_file') as save:
+        with patch('blackbox_mcp.downloads_directory') as resolve, patch('blackbox_mcp.save_export_file') as save:
             result = self.reader.call('save_export', args)
         resolve.assert_not_called(); save.assert_not_called()
         self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
@@ -308,7 +308,7 @@ class McpReaderTests(unittest.TestCase):
         for value in (None, True, '', 'old-rule', 'a' * 129):
             invalid.append(dict(valid, rule=value))
         before = self.store.database.read_bytes()
-        with patch('tas_notes_mcp.downloads_directory') as resolve, patch('tas_notes_mcp.save_export_file') as save:
+        with patch('blackbox_mcp.downloads_directory') as resolve, patch('blackbox_mcp.save_export_file') as save:
             for args in invalid:
                 with self.subTest(args=args):
                     result = self.reader.call('save_export', args)
@@ -322,8 +322,8 @@ class McpReaderTests(unittest.TestCase):
         destination = self.root / 'downloads'; destination.mkdir()
         for failure in (OSError('PRIVATE-SENTINEL'), lambda fd: os.write(fd, b'CORRUPT')):
             with self.subTest(failure=type(failure).__name__), \
-                    patch('tas_notes_mcp.downloads_directory', return_value=destination), \
-                    patch('tas_notes_mcp.os.fsync', side_effect=failure):
+                    patch('blackbox_mcp.downloads_directory', return_value=destination), \
+                    patch('blackbox_mcp.os.fsync', side_effect=failure):
                 result = self.reader.call('save_export', args)
                 self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
                     'status': 503, 'body': {'error': 'export_save_failed'}}}})
@@ -334,7 +334,7 @@ class McpReaderTests(unittest.TestCase):
         destination = self.root / 'downloads'; destination.mkdir()
         for suffix in ('', ' (1)', ' (2)'):
             (destination / ('anomaly-1-through-1' + suffix + '.md')).write_bytes(b'KEEP')
-        with patch('tas_notes_mcp.downloads_directory', return_value=destination), patch('tas_notes_mcp.MAX_EXPORT_COPIES', 3):
+        with patch('blackbox_mcp.downloads_directory', return_value=destination), patch('blackbox_mcp.MAX_EXPORT_COPIES', 3):
             result = self.reader.call('save_export', args)
         self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
             'status': 503, 'body': {'error': 'export_name_exhausted'}}}})
@@ -360,26 +360,26 @@ class McpReaderTests(unittest.TestCase):
     def test_downloads_resolver_uses_redirected_windows_known_folder_and_frees_memory(self):
         redirected = self.root / '另一个盘的 下载'; redirected.mkdir()
         dll, shell, ole = self.mock_known_folder(str(redirected))
-        with patch('tas_notes_mcp.sys.platform', 'win32'), patch('tas_notes_mcp.ctypes.WinDLL', side_effect=dll, create=True):
+        with patch('blackbox_mcp.sys.platform', 'win32'), patch('blackbox_mcp.ctypes.WinDLL', side_effect=dll, create=True):
             result = downloads_directory()
         self.assertEqual(result, redirected.resolve())
         shell.SHGetKnownFolderPath.assert_called_once(); ole.CoTaskMemFree.assert_called_once()
 
     def test_downloads_resolver_has_no_profile_fallback_on_unsupported_or_failed_resolution(self):
-        with patch('tas_notes_mcp.sys.platform', 'linux'), patch('tas_notes_mcp.ctypes.WinDLL', create=True) as dll:
+        with patch('blackbox_mcp.sys.platform', 'linux'), patch('blackbox_mcp.ctypes.WinDLL', create=True) as dll:
             with self.assertRaises(NotesError) as raised:
                 downloads_directory()
             self.assertEqual(raised.exception.public_code, 'downloads_unavailable'); dll.assert_not_called()
         for value, status in [(None, -1), (None, 0), ('', 0), ('relative-downloads', 0), (str(self.root / 'missing'), 0)]:
             with self.subTest(value=value, status=status):
                 dll, _, ole = self.mock_known_folder(value, status)
-                with patch('tas_notes_mcp.sys.platform', 'win32'), patch('tas_notes_mcp.ctypes.WinDLL', side_effect=dll, create=True):
+                with patch('blackbox_mcp.sys.platform', 'win32'), patch('blackbox_mcp.ctypes.WinDLL', side_effect=dll, create=True):
                     with self.assertRaises(NotesError) as raised:
                         downloads_directory()
                     self.assertEqual(raised.exception.public_code, 'downloads_unavailable')
                 self.assertEqual(ole.CoTaskMemFree.call_count, 0 if value is None else 1)
         args, _ = self.export_args()
-        with patch('tas_notes_mcp.sys.platform', 'linux'):
+        with patch('blackbox_mcp.sys.platform', 'linux'):
             result = self.reader.call('save_export', args)
         self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
             'status': 503, 'body': {'error': 'downloads_unavailable'}}}})
@@ -392,10 +392,10 @@ class McpReaderTests(unittest.TestCase):
         for value, drive_type in cases:
             with self.subTest(value=value, drive_type=drive_type):
                 dll, _, ole = self.mock_known_folder(value, drive_type=drive_type)
-                with patch('tas_notes_mcp.sys.platform', 'win32'), \
-                        patch('tas_notes_mcp.ctypes.WinDLL', side_effect=dll, create=True), \
-                        patch('tas_notes_mcp.resolve_state_directory', return_value=self.store.directory), \
-                        patch('tas_notes_mcp.save_export_file') as save:
+                with patch('blackbox_mcp.sys.platform', 'win32'), \
+                        patch('blackbox_mcp.ctypes.WinDLL', side_effect=dll, create=True), \
+                        patch('blackbox_mcp.resolve_state_directory', return_value=self.store.directory), \
+                        patch('blackbox_mcp.save_export_file') as save:
                     result = self.reader.call('save_export', args)
                 save.assert_not_called(); ole.CoTaskMemFree.assert_called_once()
                 self.assertEqual(result, {'content': [], '_meta': {'blackbox': {
@@ -406,19 +406,19 @@ class McpReaderTests(unittest.TestCase):
         for drive_type in (2, 3, 6):
             with self.subTest(drive_type=drive_type):
                 dll, _, _ = self.mock_known_folder(str(self.root), drive_type=drive_type)
-                with patch('tas_notes_mcp.sys.platform', 'win32'), patch('tas_notes_mcp.ctypes.WinDLL', side_effect=dll, create=True):
+                with patch('blackbox_mcp.sys.platform', 'win32'), patch('blackbox_mcp.ctypes.WinDLL', side_effect=dll, create=True):
                     self.assertEqual(downloads_directory(), self.root.resolve())
         dll, _, ole = self.mock_known_folder(str(self.root))
-        with patch('tas_notes_mcp.sys.platform', 'win32'), \
-                patch('tas_notes_mcp.ctypes.WinDLL', side_effect=dll, create=True), \
-                patch('tas_notes_mcp.Path.resolve', return_value=Path(r'\\server\share\downloads')):
+        with patch('blackbox_mcp.sys.platform', 'win32'), \
+                patch('blackbox_mcp.ctypes.WinDLL', side_effect=dll, create=True), \
+                patch('blackbox_mcp.Path.resolve', return_value=Path(r'\\server\share\downloads')):
             with self.assertRaises(NotesError) as raised:
                 downloads_directory()
             self.assertEqual(raised.exception.public_code, 'downloads_unavailable')
         ole.CoTaskMemFree.assert_called_once()
 
     def test_published_resource_references_survive_reader_update(self):
-        with patch('tas_notes_mcp.Store', side_effect=AssertionError('must not access DB')):
+        with patch('blackbox_mcp.Store', side_effect=AssertionError('must not access DB')):
             current = self.reader.dispatch('resources/read', {'uri': URI})['contents'][0]['text']
             for uri in ['ui://blackbox/reader-v1.html', 'ui://blackbox/reader-v2.html', 'ui://blackbox/reader-v3.html', 'ui://blackbox/reader-v21.html', URI]:
                 with self.subTest(uri=uri):

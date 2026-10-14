@@ -1,9 +1,9 @@
 import sys,io,json,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-import tas_notes_admission as admission
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'plugins/blackbox/scripts'))
+from blackbox_core import Store
+import blackbox_admission as admission
 
 class AdmissionTests(unittest.TestCase):
  def setUp(self):
@@ -55,12 +55,12 @@ class AdmissionTests(unittest.TestCase):
   from test_codex_names import FakeProcess
   process=FakeProcess([{'id':1,'result':{}},{'id':2,'error':{'code':-32600,'message':'thread not loaded: synthetic'}},{'id':2,'result':{'thread':{'id':'synthetic','source':'vscode','ephemeral':False}}}])
   found={}
-  with patch('tas_notes_codex.time.sleep') as delay:admission.SessionEligibility()._exchange(process,['synthetic'],found)
+  with patch('blackbox_codex.time.sleep') as delay:admission.SessionEligibility()._exchange(process,['synthetic'],found)
   self.assertEqual(found,{'synthetic':'allowed'});delay.assert_called_once_with(.15)
   requests=[json.loads(v) for v in process.stdin.content.splitlines()];reads=[v for v in requests if v.get('method')=='thread/read']
   self.assertEqual(len(reads),2);self.assertTrue(all(v['params']['includeTurns'] is False for v in reads))
  def test_production_main_enforces_admission(self):
-  import tas_notes_core as core
+  import blackbox_core as core
   from contextlib import redirect_stdout,redirect_stderr
   with patch.object(admission,'lookup',return_value='excluded'),patch.object(core.sys,'stdin',io.TextIOWrapper(io.BytesIO(json.dumps(self.payload).encode()))),redirect_stdout(io.StringIO()),redirect_stderr(io.StringIO()):
    core.main(['--state-dir',str(self.store.directory),'hook'])

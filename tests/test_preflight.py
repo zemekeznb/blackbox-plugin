@@ -13,10 +13,10 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN = ROOT / 'plugins/tas-notes'
+PLUGIN = ROOT / 'plugins/blackbox'
 sys.path.insert(0, str(PLUGIN / 'scripts'))
-import tas_notes_preflight as preflight
-from tas_notes_core import Store
+import blackbox_preflight as preflight
+from blackbox_core import Store
 
 
 class PreflightTests(unittest.TestCase):
@@ -40,18 +40,18 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(result['host_plugin_registration'], 'not_checked')
         self.assertEqual(result['host_capture'], 'not_checked')
         self.assertEqual(result['minimum_python'], '3.11')
-        self.assertTrue(any('TAS_NOTES_STATE_DIR' in item for item in result['warnings']))
+        self.assertTrue(any('BLACKBOX_STATE_DIR' in item for item in result['warnings']))
 
     def test_required_package_files_and_manifest_fail_helpfully(self):
         package = self.root / 'incomplete'
         package.mkdir()
         version, errors = preflight.check_package(package)
         self.assertIsNone(version)
-        self.assertTrue(any('scripts/tas_notes_mcp.py' in item for item in errors))
+        self.assertTrue(any('scripts/blackbox_mcp.py' in item for item in errors))
         self.assertTrue(any('manifest' in item for item in errors))
         (package / '.codex-plugin').mkdir()
         (package / '.codex-plugin/plugin.json').write_text('{"name":"other","version":"garbage"}')
-        self.assertTrue(any('technical key tas-notes' in item for item in preflight.check_package(package)[1]))
+        self.assertTrue(any('technical key blackbox' in item for item in preflight.check_package(package)[1]))
 
     def test_python_and_platform_requirements_are_actionable(self):
         with patch.object(preflight.sys, 'version_info', (3, 10, 0)):
@@ -141,10 +141,10 @@ class PreflightTests(unittest.TestCase):
             self.assertFalse((repository / 'nested').exists())
 
     def test_release_manifest_detects_tampering_and_version_mismatch(self):
-        package = self.root / 'plugins/tas-notes'
+        package = self.root / 'plugins/blackbox'
         package.mkdir(parents=True)
         files = {}
-        for name in ['plugins/tas-notes/' + item for item in preflight.REQUIRED_FILES] + ['install.ps1']:
+        for name in ['plugins/blackbox/' + item for item in preflight.REQUIRED_FILES] + ['install.ps1']:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b'test fixture')
@@ -154,13 +154,13 @@ class PreflightTests(unittest.TestCase):
         manifest_path.write_text(json.dumps(manifest))
         self.assertEqual(preflight.check_release_manifest(package, manifest['version']), ('release_manifest_verified', []))
         self.assertTrue(preflight.check_release_manifest(package, '0.3.0')[1])
-        (package / 'scripts/tas_notes.py').write_bytes(b'tampered')
+        (package / 'scripts/blackbox.py').write_bytes(b'tampered')
         self.assertTrue(preflight.check_release_manifest(package, manifest['version'])[1])
 
     def test_release_manifest_rejects_paths_outside_extraction(self):
-        package = self.root / 'plugins/tas-notes'
+        package = self.root / 'plugins/blackbox'
         package.mkdir(parents=True)
-        files = {('plugins/tas-notes/' + name): {'sha256': '0' * 64, 'size': 0}
+        files = {('plugins/blackbox/' + name): {'sha256': '0' * 64, 'size': 0}
                  for name in preflight.REQUIRED_FILES}
         files['install.ps1'] = {'sha256': '0' * 64, 'size': 0}
         for name in ('../outside', 'C:/outside', '\\\\host\\file'):
@@ -178,7 +178,7 @@ class InstallerTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.state = self.root / 'state'
         self.env = dict(os.environ, LOCALAPPDATA=str(self.root / 'appdata'),
-                        TAS_NOTES_STATE_DIR=str(self.root / 'unused-state'),
+                        BLACKBOX_STATE_DIR=str(self.root / 'unused-state'),
                         CODEX_HOME=str(self.root / 'codex'))
         # Ensure the integration checks a known Python; production does not alter PATH.
         self.env['PATH'] = str(Path(sys.executable).parent) + os.pathsep + self.env['PATH']
@@ -186,7 +186,7 @@ class InstallerTests(unittest.TestCase):
     def install(self, *options):
         return subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                                '-File', str(ROOT / 'install.ps1'), '-Python', sys.executable,
-                               '-StateDir', str(self.state), *options],
+                               '-StateDir', str(self.state), '-RuntimeOnly', *options],
                               capture_output=True, text=True, env=self.env, timeout=30)
 
     def test_check_only_has_no_state_or_codex_side_effects(self):
@@ -199,7 +199,7 @@ class InstallerTests(unittest.TestCase):
     def test_install_and_repeat_preserve_history_choices_and_service(self):
         first = self.install('-SkipShortcuts')
         self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-        self.assertIn('have NOT been verified', first.stdout)
+        self.assertIn('pending verification', first.stdout)
         self.assertTrue((self.state / 'runtime.cmd').is_file())
         store = Store(self.state)
         with store.connect() as connection:

@@ -23,14 +23,14 @@ def main():
     args = parser.parse_args()
     installed = args.installed_root.resolve(strict=True)
     sys.path.insert(0, str(installed / 'scripts'))
-    import tas_notes_anomalies as a
-    from tas_notes_launcher import build_id
-    from tas_notes_mcp import Reader
+    import blackbox_anomalies as a
+    from blackbox_launcher import build_id
+    from blackbox_mcp import Reader
     assert Path(a.__file__).resolve().parent == installed / 'scripts'
     root = args.run_root.resolve(strict=True)
     manifest = json.loads((root / 'control.json').read_text(encoding='utf-8'))
     report = {'installed_build': build_id(), 'rule': a.RULE_VERSION,
-              'build_matches': build_id() == build_id(Path(__file__).resolve().parents[1] / 'plugins/tas-notes')}
+              'build_matches': build_id() == build_id(Path(__file__).resolve().parents[1] / 'plugins/blackbox')}
     controls = {}
     for case, command in manifest['commands'].items():
         hit = a.detect({'tool_name': 'Bash', 'tool_input': {'command': command},

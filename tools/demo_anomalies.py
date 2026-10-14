@@ -3,11 +3,11 @@ from pathlib import Path
 import sys
 import tempfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store
-from tas_notes_web import serve
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store
+from blackbox_web import serve
 
-root = Path(tempfile.mkdtemp(prefix='tas-notes-anomaly-preview-'))
+root = Path(tempfile.mkdtemp(prefix='blackbox-anomaly-preview-'))
 project = root / '合成建模项目'
 project.mkdir()
 store = Store(root / 'state')

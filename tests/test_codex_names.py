@@ -12,11 +12,11 @@ import unittest
 from unittest.mock import patch
 from urllib.parse import urlencode
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-import tas_notes_codex as c
-from tas_notes_anomalies import saved_sessions
-from tas_notes_core import NotesError, Store
-from tas_notes_web import ReaderSelection, make_server
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+import blackbox_codex as c
+from blackbox_anomalies import saved_sessions
+from blackbox_core import NotesError, Store
+from blackbox_web import ReaderSelection, make_server
 
 
 class WrittenPipe:
@@ -105,6 +105,18 @@ class NameProviderTests(unittest.TestCase):
             self.assertLessEqual(len(provider._cache), 2)
         with self.assertRaises(ValueError):
             provider.names({str(i): str(i) for i in range(21)})
+
+    def test_navigation_names_refresh_renames_without_restart(self):
+        provider=c.SessionMetadata()
+        with patch.object(provider, '_lookup', return_value={'a': {'name':'old', 'status':'named'}}):
+            self.assertEqual(c.session_labels(provider, {'i':'a'})['names']['i'],'old')
+        with patch.object(provider, '_lookup', return_value={'a': {'name':'new', 'status':'named'}}) as lookup:
+            self.assertEqual(c.session_labels(provider, {'i':'a'})['names']['i'],'new')
+            lookup.assert_called_once_with(['a'])
+        with patch.object(provider, '_lookup', return_value={'a': {'name':None, 'status':'untitled'}}):
+            self.assertIsNone(c.session_labels(provider, {'i':'a'})['names']['i'])
+        with patch.object(provider, '_lookup', return_value={}):
+            self.assertEqual(c.session_labels(provider, {'i':'a'})['states']['i'],'unavailable')
 
     def test_unavailable_executable_does_not_spawn_and_missing_process_is_graceful(self):
         provider = c.SessionNames()
@@ -266,7 +278,7 @@ class ReadingMetadataTests(unittest.TestCase):
                 names.assert_not_called()
                 status, result = request(query)
                 self.assertEqual((status, result), (200, {'names': {self.identifiers[0]: 'Real title'}, 'states': {self.identifiers[0]: 'named'}}))
-                names.assert_called_once_with({self.identifiers[0]: 'thread-0'})
+                names.assert_called_once_with({self.identifiers[0]: 'thread-0'}, refresh=True)
                 self.assertEqual(request('/api/reader-selection', auth=False)[0], 401)
                 self.assertIsNone(request('/api/reader-selection')[1]['investigation'])
                 body = json.dumps({'investigation': self.identifiers[1]})
@@ -313,7 +325,7 @@ class HostNavigationTests(unittest.TestCase):
         data={'projects':[{'path':'d:\\one','enabled':True,'last_captured':'2'},{'path':'D:/two','enabled':False,'last_captured':'1'}],'sessions':[]}
         def contexts(_store,path=''):
             return {**data,'sessions':[{'id':path,'last_captured':'1'}] if path else []}
-        with patch('tas_notes_anomalies.contexts',side_effect=contexts), patch('tas_notes_anomalies.anomaly_presence',return_value={'has_anomalies':False}):
+        with patch('blackbox_anomalies.contexts',side_effect=contexts), patch('blackbox_anomalies.anomaly_presence',return_value={'has_anomalies':False}):
             result=c.navigation_contexts(None,'D:/two',catalog)
             self.assertEqual(len(result['projects']),1)
             self.assertEqual(result['projects'][0]['name'],'Real project')

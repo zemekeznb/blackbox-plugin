@@ -6,10 +6,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-from tas_notes_core import Store, MAX_FIELD, CaptureLimit
-import tas_notes_anomalies as a
-from tas_notes_mcp import Reader
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+from blackbox_core import Store, MAX_FIELD, CaptureLimit
+import blackbox_anomalies as a
+from blackbox_mcp import Reader
 
 TRACE = 'Traceback (most recent call last):\n  File "fixture.py", line 1\nTypeError: synthetic\n'
 TOOL = 'mcp__synthetic__read_resource'
@@ -125,7 +125,7 @@ class ToolErrorTests(unittest.TestCase):
 
     def test_budget_reserve_accepts_explicit_error_only(self):
         self.emit(result(False))
-        with patch('tas_notes_core.MAX_SESSION_BYTES', 1):
+        with patch('blackbox_core.MAX_SESSION_BYTES', 1):
             self.emit()
             with self.assertRaises(CaptureLimit):
                 self.emit(result(False, TRACE))

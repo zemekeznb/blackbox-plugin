@@ -4,8 +4,8 @@ import random
 import sys
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/tas-notes/scripts'))
-import tas_notes_anomalies as a
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins/blackbox/scripts'))
+import blackbox_anomalies as a
 
 
 class RepeatIndexTests(unittest.TestCase):
