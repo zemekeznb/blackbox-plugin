@@ -41,6 +41,12 @@ Blackbox, continue with `blackbox-review` after initialization; opening the page
 does not authorize project recording. The graphical setup action still needs real-host
 UI acceptance; do not claim otherwise.
 
+The Codex-guided installation helper may already have configured runtime and returned
+the verified installed_path. Use that actual cache and check the existing runtime;
+do not reinstall or repeat a source switch as an onboarding step. Check status and
+Hook trust, then open Blackbox if requested. Current-chat plugin loading can require a
+host reload; distinguish this from file installation and do not terminate the host.
+
 ## Hook trust and handoff
 
 Check `python "<plugin-root>/scripts/blackbox_hooks.py"` before reporting initialization ready. Explain untrusted/disabled/missing/unknown separately; installation does not grant Hook trust. Follow the **Guided project onboarding** section of `../blackbox-review/SKILL.md` for official review assistance and existing consent, without enabling any project during setup alone. Never write trusted_hash, copy legacy trust or bypass review.

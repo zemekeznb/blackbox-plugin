@@ -1,99 +1,46 @@
-# Blackbox Plugin 安装与首次接入
+# 安装与首次接入
 
-当前版本 **0.4.0-alpha.6.43**。面向用户的安装流程为：**Codex 命令安装 → 首次设置 → 接入项目**。
+当前版本 **0.4.0-alpha.6.44**。客户只需 Windows、已安装的 Codex 桌面版、Python 3.11+ 和网络连接。安装在 Codex 会话中完成，不需要去外部终端找 codex 命令，不需要 Git 或 GitHub 登录。
 
-## 安装前
+## 1. 在 Codex 中发送安装指令
 
-- Windows，已安装 Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版。
-- 在同一终端能运行 `python --version`、`codex --version` 和 `git --version`。Codex 从 Git 仓库获取插件，因此 Git 也需要可用。
-- 只安装 Codex 桌面版不保证 `codex` 已加入外部终端 PATH。若版本命令找不到，使用下方定位步骤调用桌面自带的同一程序，不必另外安装一份 CLI。
-- `zemekeznb/blackbox-plugin` 已公开，Git 可以匿名获取，无需 GitHub 登录或仓库授权；Codex 自身的模型使用认证仍由宿主管理。
-- 使用普通账户和当前桌面宿主对应的 Codex。不要另装一份 CLI 或切换到其他账户；如果自定义了 CODEX_HOME，应与桌面使用的目录一致。
+> 请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 
-最低 Codex 版本、另一台干净电脑和 API Key 登录模式尚待最终验收。
+Codex 会检查现有依赖、定位当前桌面程序、下载并校验固定版本插件，通过宿主的官方插件命令安装，再完成本地初始化并打开 Blackbox。下载安装是自动完成的内部步骤，无需手动取包、解压、改 PATH 或更改 PowerShell 策略。
 
-## 1. 用 Codex 安装
+若提示当前宿主需要重开才能加载新插件，保存工作、完整退出并重新打开 Codex，回到原会话发送它提供的续验提示。安装本身不启用项目，也不授予 Hook 信任。
 
-在终端依次运行，第一条成功后再执行第二条：
+## 2. 接入一个项目
 
-```powershell
-codex plugin marketplace add zemekeznb/blackbox-plugin --ref v0.4.0-alpha.6.43
-codex plugin add blackbox@personal
-```
-
-第一条获取并登记固定版本的插件源，第二条安装 Blackbox。无需手动下载、解压或运行 PowerShell 脚本；不修改 PowerShell 执行策略，也不启用任何项目采集。
-
-## 2. 在 Codex 完成首次设置
-
-回到 Codex，发送：
-
-> 请运行 blackbox-setup 完成 Blackbox 首次设置，然后用 blackbox-review 打开 Blackbox。暂不启用任何项目采集。
-
-首次设置从实际安装目录检查 Python 和本地状态，配置运行环境，然后打开界面。无需研究插件缓存路径或手动执行其中的脚本。如果宿主提供设置按钮，也会调用同一个设置技能。
-
-若 Codex 尚未识别技能，保存工作、完整退出并重新打开 Codex，再发送这句话。当前会话未加载插件时，不要反复安装。
-
-初始化成功只表示运行环境已经配置；此时尚未授权任何新项目，也不代表真实采集验证通过。
-
-## 3. 接入一个项目
-
-在 Blackbox 页面点击 **接入第一个项目**，复制提示词，发到你要记录的项目的 Codex 会话。发送前确认当前项目、保存范围和授权。
-
-页面提示词如下：
+在 Blackbox 页面点击 **接入第一个项目**，将页面提供的提示词发送到你想记录的项目会话。发送前确认项目和保存范围。
 
 > 请直接为当前项目完成 Blackbox 本地采集接入。我同意仅记录当前项目的可见输入、回复、工具调用及返回，内容可能包含项目资料或敏感信息，默认不上传。我授权你检查并配置运行环境，审阅已安装 Blackbox 的本地采集 Hook，确认其用途与上述范围一致后，通过 Codex 官方流程完成信任并启用当前项目，无需重复询问。随后执行一条无副作用的真实命令，核验对应记录确已收到。不要改动其他项目、清除历史或模拟记录；只有必须由我操作或超出上述授权时才暂停，并给出最少必要步骤。
 
-Codex 应协助完成运行检查、官方 Hook 审阅和真实命令核验。只信任已经审阅、用途符合授权范围的 Blackbox Hook，安装本身不授予信任。已有授权不重复询问。
+Codex 应检查当前项目、协助官方 Hook 审阅并验证真实记录到达。已有授权不重复询问。首次安装并信任后，可能需要完整退出重开 Codex，无需重启电脑；重开后继续验证，不必重新授权。记录送达前不能报告采集正常。
 
-首次安装并信任 Hook 后，可能需要保存工作、完整退出并重新打开 Codex 才能生效，无需重启电脑。需要重开时，Codex 应提供续验步骤；回到原会话继续验证，无需重复授权。接入完成以对应真实事件收到为准，模拟 Hook 或仅增加状态计数不算通过。
+## 安装失败时
 
-## 常见安装问题
+将具体报错发回执行安装的 Codex 会话。它应明确指出当前卡在哪一步，并给出最少必要操作。
 
-### 终端找不到 Codex
-
-如果 `codex --version` 提示无法识别命令，可在 Windows PowerShell 中定位桌面版自带程序并继续执行同样的安装命令：
-
-```powershell
-$bbCandidates = @(Get-ChildItem -Path "$env:USERPROFILE\AppData\Local\OpenAI\Codex\bin\*\codex.exe" -File -ErrorAction SilentlyContinue)
-if ($bbCandidates.Count -ne 1) { throw '未找到唯一的桌面 Codex 程序，请核对桌面安装路径与版本后继续。' }
-$bbCodex = $bbCandidates[0].FullName
-& $bbCodex --version
-& $bbCodex plugin marketplace add zemekeznb/blackbox-plugin --ref v0.4.0-alpha.6.43
-# 上一条成功后再执行：
-& $bbCodex plugin add blackbox@personal
-```
-
-该定位适用于此桌面版本已观察到的 Windows 用户目录布局，不保证所有宿主版本相同。未找到或存在多个版本时，应核对当前桌面对应的程序，不自动选最新或改系统 PATH。`$bbCodex` 仅在当前终端中使用。
-
-| 现象 | 处理方式 |
+| 现象 | 处理 |
 | --- | --- |
-| 找不到 codex、python 或 git | 检查对应程序是否已安装并加入 PATH，重新打开终端后确认版本命令可用 |
-| 无法获取仓库 | 仓库已公开，可匿名访问；检查 GitHub 网络连通性、Git 地址和本地代理配置，无需为了获取本仓库输入令牌 |
-| personal 插件源已存在或来源冲突 | 在 Codex 插件管理中核对已有来源；若包含其他插件，不要删除。确认来源归属后再处理，避免覆盖别人的插件源 |
-| 安装后没有 blackbox-setup | 确认第二条安装命令成功；保存工作后完整退出重开 Codex，再请求首次设置 |
-| Python 或运行目录预检失败 | 按具体提示修复后重新请求首次设置；不把初始化失败描述成等待记录 |
-| 项目已启用，但没有记录 | 让 Codex 检查 Hook 信任和实际运行配置，再按接入流程验证；宿主没送达的历史事件不会补回 |
+| Python 缺失或版本不满足 | 安装完整 Python 3.11+ 后重新打开 Codex，再重试 |
+| 无法唯一定位当前 Codex 桌面程序 | 保持目标桌面应用打开，让 Codex核对当前宿主；不另装 CLI 或随意选择旧版本 |
+| 下载或摘要校验失败 | 检查 GitHub 网络连接后重试；校验失败的代码不会执行 |
+| 旧 Blackbox 安装源冲突 | 仅处理属于 Blackbox 的源；包含其他插件时停止并说明，不删除其他插件 |
+| 已安装但当前会话没加载插件 | 保存工作并完整退出重开 Codex，再按续验提示完成设置 |
+| 项目已启用但没有记录 | 检查 Hook 信任、运行环境和实际回执，不把初始化成功当成采集通过 |
 
-## 更新与重试
+## 更新、停用与卸载
 
-新版发布后使用该版本说明中的 `marketplace add ... --ref <版本标签>` 更新来源，再运行 `codex plugin add blackbox@personal`。停止旧阅读服务并保存工作后更新；重新打开 Codex，完成首次设置和真实记录核验。固定标签不会自动跳到其他版本；不保证长回合热更新无损。
+更新时，在 Codex 中发送新版 README 的同一安装指令。先保存工作、停止旧阅读服务；保留原有历史、阅读偏好和项目设置。需要重开时按提示继续，不保证正在执行的长回合热加载无损。
 
-安装和首次设置不清除历史，也不自动启用新项目。已有项目开关和阅读偏好保留。旧 TAS Notes 默认目录迁到 Blackbox 并保留兼容别名，自定义目录继续使用；需要迁移但旧服务仍在运行时会停止并报告，不擅自合并两套数据。旧插件停用状态由兼容处理保留；只装新版而跳过首次设置可能保留旧身份。
+在 Blackbox 的采集设置或通过 blackbox-review 停用指定项目，历史保留。关闭页面或停止阅读服务不会停用采集。
 
-## 停用、卸载与备份
+卸载前可以让 blackbox-review 将数据备份到仓库之外的新文件，再通过 Codex 插件管理卸载 Blackbox。普通卸载不删除本地历史、Python、Codex 或其他插件。
 
-停用指定项目使用 Blackbox 的采集设置或 blackbox-review 技能，历史保留。关闭阅读页面或停止阅读服务不会关闭采集。
+## 验证边界
 
-卸载前请 blackbox-review 将数据备份到仓库外的新文件。随后可在 Codex 插件管理卸载，或执行：
+固定载荷的下载校验、无 Codex/Git PATH 的程序定位、官方登记和运行初始化可在隔离环境核验。实际客户的 Codex 会话是否完整执行安装指令、宿主重载、界面打开及真实 Hook 送达仍需要实际使用验收。最低宿主版本、干净电脑及 API Key 登录模式未完成专项验收。
 
-```powershell
-codex plugin remove blackbox@personal
-```
-
-卸载不自动删除历史数据、Python、Codex 或其他插件。不必为了停用一个插件删除整个插件源。
-
-## 验收边界
-
-命令获取、缓存文件、首次设置命令与空项目状态可以在隔离 CODEX_HOME 中核验；真实桌面首次设置交互、项目授权、官方 Hook 信任及真实记录到达需要分别验收。模拟安装不能替代用户的首次使用体验。
-
-来源：[OpenAI 官方插件打包文档](https://developers.openai.com/plugins/build/plugins)；具体 CLI 行为以本机帮助和本任务隔离实测为证据。
+技术执行步骤见 [Codex 安装说明](INSTALL-CODEX.md)，由 Codex 读取执行，客户无需逐项手动操作。

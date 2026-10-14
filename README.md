@@ -8,22 +8,13 @@
 
 ## 快速安装
 
-当前版本 **0.4.0-alpha.6.43**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。Python、Codex 和 Git 需要在终端可用。仓库已公开，获取插件无需 GitHub 登录或仓库授权；最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
+当前版本 **0.4.0-alpha.6.44**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。无需手动找程序路径、配置环境变量、安装 Git 或登录 GitHub。
 
-先在终端执行 `codex --version`。桌面版已安装不代表外部终端能识别这条命令；若提示找不到 codex，请按[安装指南中的路径定位步骤](release/INSTALL.md#终端找不到-codex)使用桌面版自带程序。
+在 **Codex 会话**中发送：
 
-确认版本命令可用后依次执行，第一条成功后再执行第二条：
+> 请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 
-```powershell
-codex plugin marketplace add zemekeznb/blackbox-plugin --ref v0.4.0-alpha.6.43
-codex plugin add blackbox@personal
-```
-
-Codex 会获取插件并安装。完成后回到 Codex，发送：
-
-> 请运行 blackbox-setup 完成 Blackbox 首次设置，然后用 blackbox-review 打开 Blackbox。暂不启用任何项目采集。
-
-如果 Codex 尚未识别新插件，保存工作、完整退出并重新打开 Codex，再发送这句话。首次设置会检查依赖并配置本地运行环境。失败时按具体提示修复后重试，详见[安装指南](release/INSTALL.md)。
+Codex 会自动定位当前宿主、下载并校验插件、完成安装与首次设置。若当前宿主需要重开才能加载新插件，请保存工作、完整退出并重新打开 Codex，再按它给出的续验提示继续。详见[安装与首次接入](release/INSTALL.md)。
 
 ## 第一次使用
 
@@ -62,7 +53,7 @@ Codex 会获取插件并安装。完成后回到 Codex，发送：
 
 | 文档 | 内容 |
 | --- | --- |
-| [安装与首次接入](release/INSTALL.md) | Codex 命令安装、首次设置、Hook 信任、升级与卸载 |
+| [安装与首次接入](release/INSTALL.md) | Codex 会话安装、首次设置、Hook 信任、升级与卸载 |
 | [Alpha 使用说明](release/ALPHA-GUIDE.md) | 保存范围、限制、备份恢复与候选包边界 |
 | [开发与验证](docs/DEVELOPMENT.md) | 测试、打包、CI 与发行规则 |
 | [架构](docs/architecture.md) | 本地采集、存储和阅读实现 |

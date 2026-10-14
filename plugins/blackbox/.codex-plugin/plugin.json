@@ -1,6 +1,6 @@
 {
   "name": "blackbox",
-  "version": "0.4.0-alpha.6.43",
+  "version": "0.4.0-alpha.6.44",
   "extensions": {
     "com.openai": {
       "onboardingSkill": "./skills/setup/SKILL.md"
