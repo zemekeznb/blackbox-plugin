@@ -10,7 +10,9 @@
 
 当前版本 **0.4.0-alpha.6.43**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。Python、Codex 和 Git 需要在终端可用。当前为私有仓库试用，需要相应 GitHub 访问权限；最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
 
-在终端依次执行，第一条成功后再执行第二条：
+先在终端执行 `codex --version`。桌面版已安装不代表外部终端能识别这条命令；若提示找不到 codex，请按[安装指南中的路径定位步骤](release/INSTALL.md#终端找不到-codex)使用桌面版自带程序。
+
+确认版本命令可用后依次执行，第一条成功后再执行第二条：
 
 ```powershell
 codex plugin marketplace add zemekeznb/blackbox-plugin --ref v0.4.0-alpha.6.43

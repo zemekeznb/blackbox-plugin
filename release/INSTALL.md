@@ -6,6 +6,7 @@
 
 - Windows，已安装 Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版。
 - 在同一终端能运行 `python --version`、`codex --version` 和 `git --version`。Codex 从 Git 仓库获取插件，因此 Git 也需要可用。
+- 只安装 Codex 桌面版不保证 `codex` 已加入外部终端 PATH。若版本命令找不到，使用下方定位步骤调用桌面自带的同一程序，不必另外安装一份 CLI。
 - 当前仓库私有，Git 必须能够访问 `zemekeznb/blackbox-plugin`。有仓库权限的 GitHub 账号与可用的 Git 认证是前提；只有 ChatGPT/Codex 登录不等于拥有该仓库权限。
 - 使用普通账户和当前桌面宿主对应的 Codex。不要另装一份 CLI 或切换到其他账户；如果自定义了 CODEX_HOME，应与桌面使用的目录一致。
 
@@ -47,6 +48,22 @@ Codex 应协助完成运行检查、官方 Hook 审阅和真实命令核验。�
 首次安装并信任 Hook 后，可能需要保存工作、完整退出并重新打开 Codex 才能生效，无需重启电脑。需要重开时，Codex 应提供续验步骤；回到原会话继续验证，无需重复授权。接入完成以对应真实事件收到为准，模拟 Hook 或仅增加状态计数不算通过。
 
 ## 常见安装问题
+
+### 终端找不到 Codex
+
+如果 `codex --version` 提示无法识别命令，可在 Windows PowerShell 中定位桌面版自带程序并继续执行同样的安装命令：
+
+```powershell
+$bbCandidates = @(Get-ChildItem -Path "$env:USERPROFILE\AppData\Local\OpenAI\Codex\bin\*\codex.exe" -File -ErrorAction SilentlyContinue)
+if ($bbCandidates.Count -ne 1) { throw '未找到唯一的桌面 Codex 程序，请核对桌面安装路径与版本后继续。' }
+$bbCodex = $bbCandidates[0].FullName
+& $bbCodex --version
+& $bbCodex plugin marketplace add zemekeznb/blackbox-plugin --ref v0.4.0-alpha.6.43
+# 上一条成功后再执行：
+& $bbCodex plugin add blackbox@personal
+```
+
+该定位适用于此桌面版本已观察到的 Windows 用户目录布局，不保证所有宿主版本相同。未找到或存在多个版本时，应核对当前桌面对应的程序，不自动选最新或改系统 PATH。`$bbCodex` 仅在当前终端中使用。
 
 | 现象 | 处理方式 |
 | --- | --- |
