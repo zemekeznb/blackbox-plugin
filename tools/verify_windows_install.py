@@ -329,7 +329,7 @@ def main(argv=None):
                'clean_windows_os': 'not_tested', 'new_windows_account': 'not_tested',
                'host_plugin_registration': 'not_tested', 'host_capture': 'not_tested',
                'execution_policy_overridden': False, 'services_requested': False,
-               'shortcuts_requested': False, 'license_pending': True, 'publish_ready': False,
+               'shortcuts_requested': False, 'license_pending': None, 'publish_ready': False,
                'scenarios': [], 'cleanup': 'not_needed',
                'limitations': ['Uses the current Windows installation and existing Python interpreter.',
                                'Does not validate Windows Store aliases, a Python installation, or a newly downloaded file security zone.',
@@ -345,6 +345,7 @@ def main(argv=None):
         receipt['archive_sha256'] = digest(archive)
         manifest, files = verify_archive(archive)
         receipt.update(archive_integrity='passed', version=manifest['version'], source=manifest['source'],
+                       license_pending=not bool(files.get('LICENSE', b'').strip()),
                        archive_file_count=len(files), publisher_authenticity='not_verified',
                        windows={'version': platform.version(), 'release': platform.release()},
                        python={'executable': sys.executable, 'version': platform.python_version()})

@@ -1,6 +1,6 @@
 # 安装与首次接入
 
-当前公开试用版 **0.4.0-alpha.6.45**，本轮仅面向 **Windows 版 Codex 桌面端**。先安装并打开 Codex，确保宿主能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集，CLI 使用支持留待后续补充。
+当前版本 **0.4.0-alpha.6.45**，本轮仅面向 **Windows 版 Codex 桌面端**。先安装并打开 Codex，确保宿主能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集，CLI 使用支持留待后续补充。
 
 ## 1. 交给 Codex 安装
 
