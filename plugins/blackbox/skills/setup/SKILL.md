@@ -1,6 +1,6 @@
 ---
 name: blackbox-setup
-description: Initialize Blackbox local runtime after graphical plugin installation, without enabling project recording.
+description: Initialize Blackbox local runtime after Codex plugin installation, without enabling project recording.
 ---
 
 # Blackbox first setup
@@ -33,9 +33,13 @@ Do not use a source checkout or guess another installed version.
    workflow. Ask for an explicit project and scope acceptance if absent. Never enable all
    projects, generate a failure, or read host conversation bodies just to finish setup.
 
-If this host does not offer the setup action, users can invoke this skill explicitly or
-run the two commands themselves. ZIP users can instead run the complete root install.ps1.
-The graphical setup action still needs real-host UI acceptance; do not claim otherwise.
+After `codex plugin marketplace add` and `codex plugin add`, users can request
+`blackbox-setup` in Codex. A setup button is optional: do not send users to download
+archives or run PowerShell installers if it is absent. Complete initialization from
+the actual installed cache using the steps above. When the user also asks to open
+Blackbox, continue with `blackbox-review` after initialization; opening the page alone
+does not authorize project recording. The graphical setup action still needs real-host
+UI acceptance; do not claim otherwise.
 
 ## Hook trust and handoff
 

@@ -33,7 +33,7 @@ SCRIPT_NAMES = (
 ASSET_NAMES = ('anomalies.html', 'anomalies.js', 'mcp-reader.js', 'review.css',
                'review.html', 'review.js')
 TEST_HELPERS = (
-    'tools/build_alpha.py', 'tools/verify_alpha_candidate.py', 'tools/verify_windows_install.py', 'tools/verify_install_flow.py', 'tools/verify_brand_migration.py',
+    'tools/build_alpha.py', 'tools/verify_alpha_candidate.py', 'tools/verify_windows_install.py', 'tools/verify_install_flow.py', 'tools/verify_brand_migration.py', 'tools/verify_git_install.py',
     'tools/bash_error_cases.py', 'tools/hook_shape_probe.py',
     'tools/probe_hook_schema.py', 'tools/probe_result_api.py', 'tools/trace_hook_entry.py',
     'tools/verify_acceptance.py', 'tools/verify_bash_coverage.py',

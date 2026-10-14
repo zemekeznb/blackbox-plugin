@@ -4,26 +4,28 @@
 
 在你明确启用的项目中，留下 Codex 执行命令时的错误返回与后续操作，按项目和会话回看，并导出可复核的 Markdown 记录。
 
-[下载](https://github.com/zemekeznb/blackbox-plugin/releases/download/v0.4.0-alpha.6.42/blackbox-plugin-0.4.0-alpha.6.42-candidate.zip) · [安装与首次接入](release/INSTALL.md) · [使用边界](release/ALPHA-GUIDE.md) · [开发与验证](docs/DEVELOPMENT.md) · [当前进展](docs/current-status.md)
+[安装与首次接入](release/INSTALL.md) · [使用边界](release/ALPHA-GUIDE.md) · [开发与验证](docs/DEVELOPMENT.md) · [当前进展](docs/current-status.md)
 
 ## 快速安装
 
-当前候选版本 **0.4.0-alpha.6.42**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。默认你已安装 Python 与 Codex；安装器不会替你下载。最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
+当前版本 **0.4.0-alpha.6.43**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。Python、Codex 和 Git 需要在终端可用。当前为私有仓库试用，需要相应 GitHub 访问权限；最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
 
-1. 点击顶部 **下载** 获取安装包；如需其他版本，在 [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) 中选择对应版本，下载 `blackbox-plugin-版本号-candidate.zip` 和同名 `.zip.sha256`。不要选择 GitHub 自动生成的 `Source code` 归档；它不是经过校验的安装候选包。
-2. 将完整包解压到长期保留的目录，例如 `D:\Apps\Blackbox`。
-3. 在解压目录打开 PowerShell，依次执行：
+在终端依次执行，第一条成功后再执行第二条：
 
 ```powershell
-.\install.ps1 -CheckOnly
-.\install.ps1
+codex plugin marketplace add zemekeznb/blackbox-plugin --ref v0.4.0-alpha.6.43
+codex plugin add blackbox@personal
 ```
 
-预检失败时先按提示修复，再安装。自定义 Python/Codex 路径、图形安装入口与升级说明见[安装指南](release/INSTALL.md)。当前为私有仓库中的试用候选包，下载需要登录有仓库访问权限的 GitHub 账号。
+Codex 会获取插件并安装。完成后回到 Codex，发送：
+
+> 请运行 blackbox-setup 完成 Blackbox 首次设置，然后用 blackbox-review 打开 Blackbox。暂不启用任何项目采集。
+
+如果 Codex 尚未识别新插件，保存工作、完整退出并重新打开 Codex，再发送这句话。首次设置会检查依赖并配置本地运行环境。失败时按具体提示修复后重试，详见[安装指南](release/INSTALL.md)。
 
 ## 第一次使用
 
-在 Codex 中调用 `blackbox-review` 打开 Blackbox，点击 **接入第一个项目**，把页面提供的接入提示词发到目标项目的 Codex 会话。发送前确认保存范围与授权；Codex 将检查运行配置、审阅 Hook、启用该项目，并执行真实命令核验记录。
+在已打开的 Blackbox 页面点击 **接入第一个项目**，把页面提供的接入提示词发到目标项目的 Codex 会话。发送前确认保存范围与授权；Codex 将检查运行配置、审阅 Hook、启用该项目，并执行真实命令核验记录。
 
 **安装和启用项目不等于采集已生效。** Hook 需要通过 Codex 官方流程信任。首次安装并信任后，可能需要保存工作、完整退出并重新打开 Codex，无需重启电脑；回到原会话继续验证，无需重复授权。看到真实命令记录到达，才算接入完成。
 
@@ -58,7 +60,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [安装与首次接入](release/INSTALL.md) | ZIP、图形入口、Hook 信任、升级及验收步骤 |
+| [安装与首次接入](release/INSTALL.md) | Codex 命令安装、首次设置、Hook 信任、升级与卸载 |
 | [Alpha 使用说明](release/ALPHA-GUIDE.md) | 保存范围、限制、备份恢复与候选包边界 |
 | [开发与验证](docs/DEVELOPMENT.md) | 测试、打包、CI 与发行规则 |
 | [架构](docs/architecture.md) | 本地采集、存储和阅读实现 |
