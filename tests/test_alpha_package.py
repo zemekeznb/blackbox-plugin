@@ -25,6 +25,10 @@ class AlphaPackageTests(unittest.TestCase):
             self.put(name, b'# synthetic fixture\n')
         self.put(alpha.PLUGIN + '.codex-plugin/plugin.json',
                  json.dumps({'name': 'blackbox', 'version': '0.4.0-alpha.1'}).encode())
+        self.put('tools/bootstrap_blackbox.py', b"VERSION = '0.4.0-alpha.1'\n")
+        self.put('release/INSTALL-CODEX.md',
+                 b'https://raw.githubusercontent.com/zemekeznb/blackbox-plugin/'
+                 b'v0.4.0-alpha.1/tools/bootstrap_blackbox.py\n')
         self.put('tests/test_example.py', b'import unittest\n')
         self.original_identity = alpha.source_identity
         self.identity = patch.object(alpha, 'source_identity', return_value={
@@ -81,6 +85,41 @@ class AlphaPackageTests(unittest.TestCase):
             self.assertTrue(set(excluded).isdisjoint(bundle.namelist()))
             self.assertIn('tests/test_example.py', bundle.namelist())
             self.assertIn('tools/build_alpha.py', bundle.namelist())
+
+    def test_bootstrap_version_drift_fails_before_writing(self):
+        self.put('tools/bootstrap_blackbox.py', b"VERSION = '0.4.0-alpha.2'\n")
+        with self.assertRaisesRegex(alpha.BuildError, 'VERSION.*plugin.json'):
+            self.build()
+        self.assertFalse((Path(self.temp.name) / 'output').exists())
+
+    def test_bootstrap_requires_one_literal_version_without_executing_code(self):
+        for source in (b'# missing version\n', b"VERSION = str('0.4.0-alpha.1')\n",
+                       b"VERSION = '0.4.0-alpha.1'\nVERSION = '0.4.0-alpha.1'\n"):
+            with self.subTest(source=source):
+                self.put('tools/bootstrap_blackbox.py', source)
+                with self.assertRaisesRegex(alpha.BuildError, 'one literal'):
+                    self.build()
+        self.put('tools/bootstrap_blackbox.py',
+                 b"raise AssertionError('must not execute')\nVERSION: str = '0.4.0-alpha.1'\n")
+        self.assertEqual('0.4.0-alpha.1', self.build()['version'])
+
+    def test_install_instruction_missing_unpinned_or_mixed_targets_fail(self):
+        target = 'https://raw.githubusercontent.com/zemekeznb/blackbox-plugin/{}/tools/bootstrap_blackbox.py'
+        for refs in ((), ('main',), ('v0.4.0-alpha.2',), ('v0.4.0-alpha.1', 'v0.4.0-alpha.2')):
+            with self.subTest(refs=refs):
+                self.put('release/INSTALL-CODEX.md', '\n'.join(target.format(ref) for ref in refs).encode())
+                with self.assertRaisesRegex(alpha.BuildError, 'bootstrap links.*fixed tag'):
+                    self.build()
+        self.assertFalse((Path(self.temp.name) / 'output').exists())
+
+    def test_install_instruction_prose_and_markdown_can_change(self):
+        text = ('# Any translated heading\n\n'
+                '[Installer](https://github.com/zemekeznb/blackbox-plugin/blob/'
+                'v0.4.0-alpha.1/tools/bootstrap_blackbox.py)\n\n'
+                '`https://raw.githubusercontent.com/zemekeznb/blackbox-plugin/'
+                'v0.4.0-alpha.1/tools/bootstrap_blackbox.py`\n')
+        self.put('release/INSTALL-CODEX.md', text.encode())
+        self.assertEqual('0.4.0-alpha.1', self.build()['version'])
 
     def test_required_file_missing_fails_before_writing(self):
         (self.root / 'install.ps1').unlink()

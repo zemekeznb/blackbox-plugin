@@ -1,46 +1,78 @@
 # 安装与首次接入
 
-当前版本 **0.4.0-alpha.6.44**。客户只需 Windows、已安装的 Codex 桌面版、Python 3.11+ 和网络连接。安装在 Codex 会话中完成，不需要去外部终端找 codex 命令，不需要 Git 或 GitHub 登录。
+当前公开试用版 **0.4.0-alpha.6.44**。先安装并打开 Windows 版 Codex 桌面应用，确保 PowerShell 和 Codex 都能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git 或 GitHub 登录；不需要单独安装 Codex CLI。
 
-## 1. 在 Codex 中发送安装指令
+## 1. 安装 Blackbox
 
-> 请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+任选一种方式，两者共用同一固定版本的安装工具和发行包。
 
-Codex 会检查现有依赖、定位当前桌面程序、下载并校验固定版本插件，通过宿主的官方插件命令安装，再完成本地初始化并打开 Blackbox。下载安装是自动完成的内部步骤，无需手动取包、解压、改 PATH 或更改 PowerShell 策略。
+### 直接命令
 
-若提示当前宿主需要重开才能加载新插件，保存工作、完整退出并重新打开 Codex，回到原会话发送它提供的续验提示。安装本身不启用项目，也不授予 Hook 信任。
+在 PowerShell 中复制运行以下整行：
+
+```powershell
+python -I -c "import hashlib,urllib.request; s=urllib.request.urlopen('https://raw.githubusercontent.com/zemekeznb/blackbox-plugin/v0.4.0-alpha.6.44/tools/bootstrap_blackbox.py',timeout=30).read(131073); assert hashlib.sha256(s).hexdigest()=='6ce1f21bf1bbd672ea56b7757d3061be272c3f55f42c68758b131f8afc02c616','Installer checksum mismatch'; exec(compile(s,'blackbox-install','exec'))"
+```
+
+命令从公开固定标签获取[安装工具](https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/tools/bootstrap_blackbox.py)，先校验工具的固定 SHA256，再执行。安装工具会定位运行中的 Codex、下载并校验插件包、通过官方命令登记并完成本地初始化；不修改持久 PATH 或 PowerShell 执行策略。摘要是完整性校验，不是独立发布者签名。
+
+进程成功退出且输出包含 `"installed": true` 和 `"runtime_configured": true` 时，文件安装与初始化完成。然后在 Codex 中发送：
+
+```text
+打开 Blackbox。
+```
+
+### Codex 引导
+
+不想操作终端时，在 Codex 会话中发送：
+
+```text
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+```
+
+Codex 会读取执行说明、检查依赖，并调用同一个安装工具。无需再运行上面的命令。
+
+### 插件尚未加载时
+
+按 Codex 提示刷新或新开会话。若仍需完整重载，先保存工作，完整退出并重新打开 Codex，然后发送：
+
+```text
+继续完成 Blackbox 的首次设置并打开页面，暂不启用任何项目采集。
+```
+
+安装只完成插件登记和运行初始化，不启用新项目、不授予 Hook 信任。更新时已有项目开关保持原状。
 
 ## 2. 接入一个项目
 
-在 Blackbox 页面点击 **接入第一个项目**，将页面提供的提示词发送到你想记录的项目会话。发送前确认项目和保存范围。
+在 Blackbox 页面点击 **接入第一个项目**，阅读提示中的项目与保存范围，再把页面提供的接入提示词发到目标项目的 Codex 会话。页面提示词是接入授权的统一入口。
 
-> 请直接为当前项目完成 Blackbox 本地采集接入。我同意仅记录当前项目的可见输入、回复、工具调用及返回，内容可能包含项目资料或敏感信息，默认不上传。我授权你检查并配置运行环境，审阅已安装 Blackbox 的本地采集 Hook，确认其用途与上述范围一致后，通过 Codex 官方流程完成信任并启用当前项目，无需重复询问。随后执行一条无副作用的真实命令，核验对应记录确已收到。不要改动其他项目、清除历史或模拟记录；只有必须由我操作或超出上述授权时才暂停，并给出最少必要步骤。
+保存范围包括当前项目的可见输入、回复、工具调用及返回，可能含项目内容或敏感信息，默认不上传。Codex 会协助完成官方 Hook 审阅、启用该项目，并执行无副作用的真实命令检查记录。已有授权无需重复提供；需要重开时按给出的续验步骤继续，无需重启电脑。
 
-Codex 应检查当前项目、协助官方 Hook 审阅并验证真实记录到达。已有授权不重复询问。首次安装并信任后，可能需要完整退出重开 Codex，无需重启电脑；重开后继续验证，不必重新授权。记录送达前不能报告采集正常。
+**安装成功、项目已启用、真实记录已收到是三个不同状态。只有对应记录收到，项目接入才完成。**
 
-## 安装失败时
+## 遇到问题
 
-将具体报错发回执行安装的 Codex 会话。它应明确指出当前卡在哪一步，并给出最少必要操作。
+将具体报错发回 Codex，或提交[问题反馈](https://github.com/zemekeznb/blackbox-plugin/issues)。说明使用哪种入口、当前版本和失败步骤，先移除密钥与私人内容。
 
-| 现象 | 处理 |
+| 现象 | 下一步 |
 | --- | --- |
-| Python 缺失或版本不满足 | 安装完整 Python 3.11+ 后重新打开 Codex，再重试 |
-| 无法唯一定位当前 Codex 桌面程序 | 保持目标桌面应用打开，让 Codex核对当前宿主；不另装 CLI 或随意选择旧版本 |
-| 下载或摘要校验失败 | 检查 GitHub 网络连接后重试；校验失败的代码不会执行 |
-| 旧 Blackbox 安装源冲突 | 仅处理属于 Blackbox 的源；包含其他插件时停止并说明，不删除其他插件 |
-| 已安装但当前会话没加载插件 | 保存工作并完整退出重开 Codex，再按续验提示完成设置 |
-| 项目已启用但没有记录 | 检查 Hook 信任、运行环境和实际回执，不把初始化成功当成采集通过 |
+| `python` 不存在或版本不满足 | 安装完整 Python 3.11+ 并启用其 PATH 选项，再重新打开 PowerShell 与 Codex |
+| 无法定位 Codex，或发现多个宿主 | 打开目标 Codex 桌面应用；仍有歧义时让 Codex 检查，不另装 CLI 或随意选旧版本 |
+| 网络、工具或发行包摘要校验失败 | 检查 GitHub 连接，重新复制当前 README 命令；不要跳过校验 |
+| 安装源冲突 | 让 Codex 检查 Blackbox 安装源；若同一个 `personal` 源含其他插件，不删除整个源 |
+| 安装完成但没有 Blackbox 工具 | 按上面的“插件尚未加载时”继续；不要反复重装 |
+| 项目已启用但没有记录 | 检查 Hook 信任、运行配置与实际回执，必要时重载；不要以初始化成功代替采集验证 |
 
 ## 更新、停用与卸载
 
-更新时，在 Codex 中发送新版 README 的同一安装指令。先保存工作、停止旧阅读服务；保留原有历史、阅读偏好和项目设置。需要重开时按提示继续，不保证正在执行的长回合热加载无损。
+- **更新：** 先保存工作，并在 Codex 中让 Blackbox 停止阅读服务，再使用新版 README 的任一安装入口。历史、阅读偏好和项目设置保留；需要重开时按提示继续。正在进行的长回合不保证无损热加载。
+- **停用项目：** 在采集设置中停用指定项目，或让 `blackbox-review` 完成。关闭页面或停止阅读服务不会停用采集，停用不删除历史。
+- **卸载：** 可先让 `blackbox-review` 将数据备份到仓库之外的新文件，再通过 Codex 插件管理卸载。普通卸载不删除本地历史、Python、Codex 或其他插件。
 
-在 Blackbox 的采集设置或通过 blackbox-review 停用指定项目，历史保留。关闭页面或停止阅读服务不会停用采集。
+备份恢复、导出及隐私说明见[使用与隐私](ALPHA-GUIDE.md)。
 
-卸载前可以让 blackbox-review 将数据备份到仓库之外的新文件，再通过 Codex 插件管理卸载 Blackbox。普通卸载不删除本地历史、Python、Codex 或其他插件。
+## 已验证到哪一步
 
-## 验证边界
+.44 已有公开下载校验、缺少 Codex/Git PATH 条件下的隔离安装、重复安装和初始化证据。实际用户的桌面打开、Hook 信任、重载与真实记录到达须分别验收；干净电脑、最低 Codex 版本及 API Key 登录模式尚未完成专项验收。最新证据见[当前状态](../docs/current-status.md)。
 
-固定载荷的下载校验、无 Codex/Git PATH 的程序定位、官方登记和运行初始化可在隔离环境核验。实际客户的 Codex 会话是否完整执行安装指令、宿主重载、界面打开及真实 Hook 送达仍需要实际使用验收。最低宿主版本、干净电脑及 API Key 登录模式未完成专项验收。
-
-技术执行步骤见 [Codex 安装说明](INSTALL-CODEX.md)，由 Codex 读取执行，客户无需逐项手动操作。
+[Codex 执行说明](INSTALL-CODEX.md)供安装会话读取；[开发与验证](../docs/DEVELOPMENT.md)供维护者使用。

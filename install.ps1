@@ -1,3 +1,5 @@
+# Maintenance/compatibility installer for an already extracted package.
+# New users: use either supported entrypoint in README.md / release/INSTALL.md.
 [CmdletBinding()]
 param(
     [string]$Python = 'python',

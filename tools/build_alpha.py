@@ -6,6 +6,7 @@ The file allowlist is deliberately independent of git tracking and ignore rules.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import io
 import json
@@ -148,6 +149,33 @@ def source_identity(root):
         return {'commit': None, 'dirty': None, 'status': 'unavailable'}
 
 
+def check_install_entrypoints(payload, version):
+    """Keep fixed installation targets aligned without executing the bootstrap."""
+    try:
+        tree = ast.parse(payload['tools/bootstrap_blackbox.py'].decode('utf-8-sig'))
+        instructions = payload['release/INSTALL-CODEX.md'].decode('utf-8-sig')
+    except (KeyError, UnicodeError, SyntaxError) as exc:
+        raise BuildError('Installation entrypoints must contain valid Python and UTF-8 instructions.') from exc
+    assignments = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == 'VERSION' for target in node.targets):
+            assignments.append(node.value)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == 'VERSION':
+            assignments.append(node.value)
+    if (len(assignments) != 1 or not isinstance(assignments[0], ast.Constant)
+            or assignments[0].value != version):
+        raise BuildError('bootstrap_blackbox.py VERSION must be one literal matching plugin.json version.')
+    # Check actual download targets, not translated prose or README contents.
+    # Both URLs identify the same tagged source; an unpinned or mixed target fails.
+    refs = re.findall(
+        r'https://(?:raw\.githubusercontent\.com/zemekeznb/blackbox-plugin/'
+        r'|github\.com/zemekeznb/blackbox-plugin/blob/)'
+        r'([^/\s`<>]+)/tools/bootstrap_blackbox\.py\b', instructions)
+    if not refs or set(refs) != {'v' + version}:
+        raise BuildError('INSTALL-CODEX.md bootstrap links must use the fixed tag matching plugin.json version.')
+
+
 def _write_atomic(path, data):
     if path.is_symlink() or (path.exists() and _linked(path)):
         raise BuildError(f'Refusing linked output: {path.name}')
@@ -176,6 +204,7 @@ def build(source_root, output_dir=None, *, for_release=False):
         raise BuildError('plugin.json must contain a valid JSON object with a version.') from exc
     if not isinstance(version, str) or not VERSION_PATTERN.fullmatch(version):
         raise BuildError('plugin.json version must be a safe semantic version (for example 0.4.0-alpha.1).')
+    check_install_entrypoints(payload, version)
     if 'LICENSE' in payload and not payload['LICENSE'].strip():
         raise BuildError('LICENSE is empty; supply the approved license or omit it for a local candidate.')
     license_pending = 'LICENSE' not in payload

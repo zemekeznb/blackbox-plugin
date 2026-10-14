@@ -2,64 +2,75 @@
 
 **给 Codex 的本地执行异常记录本。**
 
-在你明确启用的项目中，留下 Codex 执行命令时的错误返回与后续操作，按项目和会话回看，并导出可复核的 Markdown 记录。
+按项目和会话回看命令错误、保存的返回与后续操作，导出可复核的 Markdown 记录。默认保存在本机，只记录你明确接入的项目。
 
-[安装与首次接入](release/INSTALL.md) · [使用边界](release/ALPHA-GUIDE.md) · [开发与验证](docs/DEVELOPMENT.md) · [当前进展](docs/current-status.md)
+[安装指南](release/INSTALL.md) · [使用与隐私](release/ALPHA-GUIDE.md) · [问题反馈](https://github.com/zemekeznb/blackbox-plugin/issues) · [开发与验证](docs/DEVELOPMENT.md)
 
 ## 快速安装
 
-当前版本 **0.4.0-alpha.6.44**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。无需手动找程序路径、配置环境变量、安装 Git 或登录 GitHub。
+当前公开试用版 **0.4.0-alpha.6.44**。需要 **Windows、Codex 桌面版、可通过 `python` 调用的 Python 3.11+**，以及能够访问 GitHub 的网络。安装前打开 Codex；无需 Git、GitHub 登录或单独安装 Codex CLI。
+
+两种方式任选一种，安装的是同一版本。
+
+### 方式一：直接运行命令
+
+在 **PowerShell** 中复制运行：
+
+```powershell
+python -I -c "import hashlib,urllib.request; s=urllib.request.urlopen('https://raw.githubusercontent.com/zemekeznb/blackbox-plugin/v0.4.0-alpha.6.44/tools/bootstrap_blackbox.py',timeout=30).read(131073); assert hashlib.sha256(s).hexdigest()=='6ce1f21bf1bbd672ea56b7757d3061be272c3f55f42c68758b131f8afc02c616','Installer checksum mismatch'; exec(compile(s,'blackbox-install','exec'))"
+```
+
+命令校验固定安装工具后自动下载、校验并安装插件，完成本地初始化。输出中 `installed` 和 `runtime_configured` 均为 `true` 表示安装完成。随后在 Codex 中发送：
+
+```text
+打开 Blackbox。
+```
+
+### 方式二：交给 Codex 安装
 
 在 **Codex 会话**中发送：
 
-> 请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+```text
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.44/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+```
 
-Codex 会自动定位当前宿主、下载并校验插件、完成安装与首次设置。若当前宿主需要重开才能加载新插件，请保存工作、完整退出并重新打开 Codex，再按它给出的续验提示继续。详见[安装与首次接入](release/INSTALL.md)。
+两种方式都不会自动启用项目。若 Codex 提示插件尚未加载，按提示新开会话；确需重载时，保存工作并完整退出重开 Codex。详细排查见[安装指南](release/INSTALL.md)。
 
-## 第一次使用
+## 接入项目与日常使用
 
-在已打开的 Blackbox 页面点击 **接入第一个项目**，把页面提供的接入提示词发到目标项目的 Codex 会话。发送前确认保存范围与授权；Codex 将检查运行配置、审阅 Hook、启用该项目，并执行真实命令核验记录。
+1. 在 Blackbox 页面点击 **接入第一个项目**。
+2. 阅读保存范围，把页面提供的提示词发送到目标项目的 Codex 会话。
+3. Codex 完成项目设置、协助官方 Hook 信任审阅，并用一条无副作用的真实命令检查记录是否收到。需要重开时，按提示回来继续。
 
-**安装和启用项目不等于采集已生效。** Hook 需要通过 Codex 官方流程信任。首次安装并信任后，可能需要保存工作、完整退出并重新打开 Codex，无需重启电脑；回到原会话继续验证，无需重复授权。看到真实命令记录到达，才算接入完成。
-
-日常继续在 Codex 中工作，需要复盘时打开 Blackbox：选择项目和会话，查看异常返回及关联操作，必要时导出记录。
+**收到对应真实记录，才表示项目接入成功。** 此后继续正常使用 Codex；要回看时发送“打开 Blackbox”，选择项目、会话和异常，查看或导出记录。
 
 ## 它能帮你做什么
 
 | 能力 | 用途 |
 | --- | --- |
-| 按项目、会话回看 | 找到某次工作中已收到并识别的执行异常 |
-| 命令与返回对照 | 保留可查看的来源，减少凭记忆描述问题 |
-| 后续操作关联 | 查看保守关联的重复调用与后续操作，不自动判定修复成功 |
-| 时间和类型筛选 | 缩小要查看的异常范围 |
-| Markdown 导出 | 保存固定范围快照，用于复盘或自行分享 |
-| 本地管理 | 按项目启停采集，查看状态，备份、恢复和清理记录 |
+| 按项目、会话回看 | 找到已收到并识别的执行异常 |
+| 命令与返回对照 | 查看保存的来源，减少凭记忆描述问题 |
+| 后续操作关联 | 查看保守关联的重复调用，不自动判定修复成功 |
+| 筛选与 Markdown 导出 | 缩小范围，保存可自行分享的快照 |
+| 本地管理 | 按项目启停采集，备份、恢复和清理记录 |
 
-## 数据与宿主边界
+## 数据与适用范围
 
-- 无 Blackbox 账号、订阅绑定或独立模型调用；依赖 Codex 的本地 Hook 与会话接口。
-- 默认保存在本机，不自动上传。保存范围包括获授权的可见输入、回复、工具调用及返回，**不只异常**；有限脱敏不能保证去掉所有敏感信息。
-- 默认目录为 `%LOCALAPPDATA%\Blackbox`。Windows 打包应用可能映射目录，以状态输出的实际路径为准。
-- 安装不会自动选择项目；只接收已启用项目中经宿主确认的持久用户会话。临时、内部或身份未确认的事件不保存。
-- 宿主未投递的记录不会补回；无法识别的异常可能漏记。“暂无异常”不等于执行没有失败，也不推断根因或责任。
-- 当前面向 Codex + Windows。直接调用模型 API、DeepSeek Harness 和其他宿主尚未适配；API Key 登录 Codex 的完整链路尚未实测。
-- 从旧 TAS Notes 升级时保留数据与配置兼容；旧名称仅作为兼容输入和历史证据保留。
+- 默认本地保存，不自动上传，不需要 Blackbox 账号，也不自动调用额外模型。
+- 保存范围包含获授权的可见输入、回复、工具调用及返回，**不只异常**。有限脱敏不能保证去掉所有敏感信息。
+- 当前仅面向 **Codex + Windows**。宿主未投递的内容无法补回；“暂无异常”不等于执行没有失败，也不判断根因或责任。
+- 关闭页面不会停用采集；更新和普通卸载会保留已有数据。操作说明见[使用与隐私](release/ALPHA-GUIDE.md)。
 
-## 卸载与备份
-
-先使用 `blackbox-review` 备份本地数据，再从 Codex 插件管理卸载 Blackbox。普通卸载不自动删除历史数据，也不卸载 Python、Codex 或其他插件。停止阅读服务不等于关闭项目采集。完整操作见[安装指南](release/INSTALL.md)。
-
-## 文档
+## 文档与反馈
 
 | 文档 | 内容 |
 | --- | --- |
-| [安装与首次接入](release/INSTALL.md) | Codex 会话安装、首次设置、Hook 信任、升级与卸载 |
-| [Alpha 使用说明](release/ALPHA-GUIDE.md) | 保存范围、限制、备份恢复与候选包边界 |
-| [开发与验证](docs/DEVELOPMENT.md) | 测试、打包、CI 与发行规则 |
-| [架构](docs/architecture.md) | 本地采集、存储和阅读实现 |
-| [当前状态](docs/current-status.md) | 已验证结果与未完成事项 |
-| [发行差距对照](docs/reports/NOTES-131-release-gaps.md) | 对照参考项目整理的后续工作 |
+| [安装指南](release/INSTALL.md) | 两种入口、首次接入、排查、更新与卸载 |
+| [使用与隐私](release/ALPHA-GUIDE.md) | 保存范围、备份恢复、导出和已知限制 |
+| [开发与验证](docs/DEVELOPMENT.md) | 测试、构建、CI、发行与当前进展 |
+
+遇到问题请到 [Issues](https://github.com/zemekeznb/blackbox-plugin/issues) 提供版本、失败步骤及脱敏后的报错。不要附完整数据库、对话正文、密钥或账号凭据。
 
 ## 许可
 
-仓库现已公开供查看和试用，尚未选定开源许可证。公开可访问不代表已授予修改、再分发或其他开源许可；具体许可仍由维护者决定。
+仓库公开供查看和试用，尚未选定开源许可证。公开可访问不代表已授予开源许可。
