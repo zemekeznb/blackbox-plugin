@@ -22,9 +22,9 @@ python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.43-can
 
 普通构建不代表发布许可。`--for-release` 要求已有 LICENSE 和干净提交，但仍不会发布或证明真实宿主采集通过。当前尚未确定开源许可证，没有自动 GitHub Release、市场发布或 npm 发布流程。
 
-面向用户只提供 README 中的 Codex 命令安装；.43 起标签固定到安装来源提交，由 blackbox-setup 完成初始化，不再引导下载 ZIP 或运行根目录安装脚本。历史 .42 附件和源码中的兼容安装脚本保留，构建工具仍可用于维护者的离线回归。版本以私有仓库 [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) 为准，后续版本需逐次授权发布，不自动生成版本或发布。
+面向用户只提供 README 中的 Codex 命令安装；.43 起标签固定到安装来源提交，由 blackbox-setup 完成初始化，不再引导下载 ZIP 或运行根目录安装脚本。历史 .42 附件和源码中的兼容安装脚本保留，构建工具仍可用于维护者的离线回归。版本以公开仓库 [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) 为准，后续版本需逐次授权发布，不自动生成版本或发布。
 
-已具备私有仓库 Git 权限时，可运行以下集成检查。它在临时 CODEX_HOME 中执行真实 Codex CLI 获取/安装和缓存内首次设置，不调用模型、不改用户真实安装或信任。输出路径须为新文件：
+可运行以下集成检查，公开仓库无需 GitHub 认证。它在临时 CODEX_HOME 中执行真实 Codex CLI 获取/安装和缓存内首次设置，不调用模型、不改用户真实安装或信任。输出路径须为新文件：
 
 ```powershell
 python tools/verify_git_install.py --ref v0.4.0-alpha.6.43 --version 0.4.0-alpha.6.43 --output .local/git-install-43.json

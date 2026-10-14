@@ -7,7 +7,7 @@
 - Windows，已安装 Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版。
 - 在同一终端能运行 `python --version`、`codex --version` 和 `git --version`。Codex 从 Git 仓库获取插件，因此 Git 也需要可用。
 - 只安装 Codex 桌面版不保证 `codex` 已加入外部终端 PATH。若版本命令找不到，使用下方定位步骤调用桌面自带的同一程序，不必另外安装一份 CLI。
-- 当前仓库私有，Git 必须能够访问 `zemekeznb/blackbox-plugin`。有仓库权限的 GitHub 账号与可用的 Git 认证是前提；只有 ChatGPT/Codex 登录不等于拥有该仓库权限。
+- `zemekeznb/blackbox-plugin` 已公开，Git 可以匿名获取，无需 GitHub 登录或仓库授权；Codex 自身的模型使用认证仍由宿主管理。
 - 使用普通账户和当前桌面宿主对应的 Codex。不要另装一份 CLI 或切换到其他账户；如果自定义了 CODEX_HOME，应与桌面使用的目录一致。
 
 最低 Codex 版本、另一台干净电脑和 API Key 登录模式尚待最终验收。
@@ -68,7 +68,7 @@ $bbCodex = $bbCandidates[0].FullName
 | 现象 | 处理方式 |
 | --- | --- |
 | 找不到 codex、python 或 git | 检查对应程序是否已安装并加入 PATH，重新打开终端后确认版本命令可用 |
-| 仓库不存在、认证失败或无访问权限 | 确认 GitHub 账号有私有仓库权限，并让 Git 完成正常认证；无需把令牌发到聊天中 |
+| 无法获取仓库 | 仓库已公开，可匿名访问；检查 GitHub 网络连通性、Git 地址和本地代理配置，无需为了获取本仓库输入令牌 |
 | personal 插件源已存在或来源冲突 | 在 Codex 插件管理中核对已有来源；若包含其他插件，不要删除。确认来源归属后再处理，避免覆盖别人的插件源 |
 | 安装后没有 blackbox-setup | 确认第二条安装命令成功；保存工作后完整退出重开 Codex，再请求首次设置 |
 | Python 或运行目录预检失败 | 按具体提示修复后重新请求首次设置；不把初始化失败描述成等待记录 |

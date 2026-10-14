@@ -1,6 +1,6 @@
 """Exercise Codex Git install and packaged setup in a fresh, isolated CODEX_HOME.
 
-Uses existing Git credentials to fetch the selected repository/ref. No model is
+Uses Git to fetch the selected repository/ref; public sources need no login. No model is
 called, no project enabled, no Hook trusted, and the user's Codex is not installed.
 """
 import argparse
