@@ -22,6 +22,8 @@ python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.42-can
 
 普通构建不代表发布许可。`--for-release` 要求已有 LICENSE 和干净提交，但仍不会发布或证明真实宿主采集通过。当前尚未确定开源许可证，没有自动 GitHub Release、市场发布或 npm 发布流程。
 
+现有 .42 试用包已人工发布到私有仓库 [Releases](https://github.com/zemekeznb/blackbox-plugin/releases)。版本 tag 固定到构建来源提交，安装 ZIP、SHA256 文件与构建清单单独上传；回下载核对后才更新 README 的下载入口。GitHub 自动生成的源码归档不代替经过校验的安装候选包。后续版本仍需逐次授权发布，不自动生成版本或发布。
+
 ## 验证边界
 
 单元测试和模拟 Hook 只验证代码路径。安装成功、Hook 已信任与真实事件收到必须分别验收；不能用离线测试替代新用户安装、Codex 重载、真实命令投递和界面体验。已知限制见 [当前状态](current-status.md)。

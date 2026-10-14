@@ -4,13 +4,13 @@
 
 在你明确启用的项目中，留下 Codex 执行命令时的错误返回与后续操作，按项目和会话回看，并导出可复核的 Markdown 记录。
 
-[安装与首次接入](release/INSTALL.md) · [使用边界](release/ALPHA-GUIDE.md) · [开发与验证](docs/DEVELOPMENT.md) · [当前进展](docs/current-status.md)
+[下载](https://github.com/zemekeznb/blackbox-plugin/releases/download/v0.4.0-alpha.6.42/blackbox-plugin-0.4.0-alpha.6.42-candidate.zip) · [安装与首次接入](release/INSTALL.md) · [使用边界](release/ALPHA-GUIDE.md) · [开发与验证](docs/DEVELOPMENT.md) · [当前进展](docs/current-status.md)
 
 ## 快速安装
 
 当前候选版本 **0.4.0-alpha.6.42**。需要 **Windows、Python 3.11+ 和支持本地插件、MCP、Hook 的 Codex 桌面版**。默认你已安装 Python 与 Codex；安装器不会替你下载。最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
 
-1. 获取维护者提供的 `blackbox-plugin-0.4.0-alpha.6.42-candidate.zip` 与同名 `.zip.sha256`，核对 SHA256。
+1. 点击顶部 **下载** 获取安装包；如需其他版本，在 [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) 中选择对应版本，下载 `blackbox-plugin-版本号-candidate.zip` 和同名 `.zip.sha256`。不要选择 GitHub 自动生成的 `Source code` 归档；它不是经过校验的安装候选包。
 2. 将完整包解压到长期保留的目录，例如 `D:\Apps\Blackbox`。
 3. 在解压目录打开 PowerShell，依次执行：
 
@@ -19,7 +19,7 @@
 .\install.ps1
 ```
 
-预检失败时先按提示修复，再安装。自定义 Python/Codex 路径、图形安装入口与升级说明见[安装指南](release/INSTALL.md)。当前为私有仓库中的试用候选包，尚无公开下载渠道。
+预检失败时先按提示修复，再安装。自定义 Python/Codex 路径、图形安装入口与升级说明见[安装指南](release/INSTALL.md)。当前为私有仓库中的试用候选包，下载需要登录有仓库访问权限的 GitHub 账号。
 
 ## 第一次使用
 
