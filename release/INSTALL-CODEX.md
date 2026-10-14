@@ -2,7 +2,7 @@
 
 适用于用户在 Codex 中明确要求从 zemekeznb/blackbox-plugin 安装并初始化 Blackbox。固定版本 **0.4.0-alpha.6.44**。需要 Windows Codex 桌面版、在宿主中可通过 python 调用的 Python 3.11+ 与正常网络；不要求外部终端可运行 codex、Git、GitHub 登录或手工下载归档。
 
-这是 Codex 引导入口的执行契约；用户操作步骤见 [安装指南](INSTALL.md)。如果用户已通过直接命令成功安装，不再下载或切换安装源：从官方插件清单确认实际已安装缓存，再按其中 setup/review 技能完成检查并打开页面。
+这是 Codex 对话安装入口的执行契约；用户操作步骤见 [安装指南](INSTALL.md)。如果当前目标版本已成功安装，不再下载或切换安装源：从官方插件清单确认实际已安装缓存，再按其中 setup/review 技能完成检查并打开页面。
 
 ## 安装授权和范围
 
