@@ -5,7 +5,7 @@
 Blackbox records local execution errors for **Codex desktop on Windows**. It lets you review saved commands, results, and conservatively linked follow-up calls by project and conversation, then export a Markdown snapshot. Recording requires explicit approval for each project.
 
 <!-- blackbox:published:start -->
-The current version is **0.4.0-alpha.6.46**. The interface currently uses Chinese; this guide keeps the original button labels alongside English explanations.
+The current version is **0.4.0-alpha.6.47**. The interface currently uses Chinese; this guide keeps the original button labels alongside English explanations.
 <!-- blackbox:published:end -->
 
 The installation entry below stays on the published version that has passed download verification; preparing a draft does not switch it.
@@ -18,7 +18,7 @@ Send this message in a **Codex desktop conversation**:
 
 <!-- blackbox:published:start -->
 ```text
-Please install and initialize Blackbox by following https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md, then open its interface. Do not enable recording for any project yet, and do not change my model, account, or system environment configuration.
+Please install and initialize Blackbox by following https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.47/release/INSTALL-CODEX.md, then open its interface. Do not enable recording for any project yet, and do not change my model, account, or system environment configuration.
 ```
 <!-- blackbox:published:end -->
 
@@ -111,7 +111,7 @@ Release .45 rechecks old conversation identity caches. Events whose identity can
 | --- | --- |
 | [Chinese installation guide](../INSTALL.md) | Installation, project setup, troubleshooting, updates, and removal |
 | [Chinese usage and privacy guide](../../release/ALPHA-GUIDE.md) | Local records, exports, backup, restore, and limitations |
-| [Instructions for Codex](https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md) (Chinese) | The installation procedure followed by the assistant |
+| [Instructions for Codex](https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.47/release/INSTALL-CODEX.md) (Chinese) | The installation procedure followed by the assistant |
 | [Development and validation](../DEVELOPMENT.md) (Chinese) | Tests, CI, release drafts, and installation entry updates after approved publication |
 | [Architecture](../architecture.md) (Chinese) | Data flow, storage, permissions, and component boundaries |
 | [GitHub Issues](https://github.com/zemekeznb/blackbox-plugin/issues) | Bug reports and feedback |

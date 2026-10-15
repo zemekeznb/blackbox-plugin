@@ -8,7 +8,7 @@
 
 <!-- blackbox:published:start -->
 <p align="center">
-  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.46"><img src="https://img.shields.io/badge/version-0.4.0--alpha.6.46-b6532f?style=flat-square" alt="Version 0.4.0-alpha.6.46"></a>
+  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.47"><img src="https://img.shields.io/badge/version-0.4.0--alpha.6.47-b6532f?style=flat-square" alt="Version 0.4.0-alpha.6.47"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
   <a href="docs/en/README.md"><img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows"></a>
   <a href="docs/en/README.md"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
@@ -32,7 +32,7 @@ Review execution errors, saved command results and follow-up calls by project an
 ## Quick start
 
 <!-- blackbox:published:start -->
-The current version is **0.4.0-alpha.6.46**. You need **Windows, the Codex desktop app, an existing Python 3.11+ runtime (the runtime provided by Codex is supported)**, and access to GitHub. Git, a GitHub login and a separate Codex CLI installation are not required.
+The current version is **0.4.0-alpha.6.47**. You need **Windows, the Codex desktop app, an existing Python 3.11+ runtime (the runtime provided by Codex is supported)**, and access to GitHub. Git, a GitHub login and a separate Codex CLI installation are not required.
 <!-- blackbox:published:end -->
 
 This entry point stays on the published version that has passed download verification.
@@ -41,7 +41,7 @@ This entry point stays on the published version that has passed download verific
 
 <!-- blackbox:published:start -->
 ```text
-Please install and initialize Blackbox by following https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md, then open its interface. Do not enable recording for any project yet, and do not change my model, account, or system environment configuration.
+Please install and initialize Blackbox by following https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.47/release/INSTALL-CODEX.md, then open its interface. Do not enable recording for any project yet, and do not change my model, account, or system environment configuration.
 ```
 <!-- blackbox:published:end -->
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "version": "0.4.0-alpha.6.46",
-  "tag": "v0.4.0-alpha.6.46",
-  "tag_commit": "3be00684de7e45d7f9b94221487dd11ae471b0f1",
-  "archive_sha256": "102cf311e0d71d6d75a5e6d7bd518df4ca75d27fbfb035972560a3d6062e5865"
+  "version": "0.4.0-alpha.6.47",
+  "tag": "v0.4.0-alpha.6.47",
+  "tag_commit": "2b4d39fef82694c10c385cabe1f216eb06e83d18",
+  "archive_sha256": "80c037b61f662f07889e43a6701237e018c1d39a11299e7d066fb484a5c969c3"
 }
