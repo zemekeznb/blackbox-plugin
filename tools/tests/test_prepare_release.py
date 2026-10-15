@@ -1,6 +1,7 @@
 """Release automation tests use synthetic files and mocked GitHub operations."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -124,39 +125,89 @@ class RemoteTests(unittest.TestCase):
                 release.api('repos/test/ref', allow_missing=True)
 
     def test_read_token_cannot_claim_drafts_absent(self):
-        with patch.object(release, 'api', return_value={
-                'full_name': release.REPOSITORY, 'permissions': {'push': False}}):
-            with self.assertRaisesRegex(release.ReleaseError, 'local-only'):
-                release.ensure_available(TAG)
+        # A user's push role or self-reported Actions environment does not prove
+        # that this particular token has Contents(write).
+        for permissions in (None, {'push': False}, {'push': True}):
+            for status in (401, 403, 404):
+                repository = {'full_name': release.REPOSITORY}
+                if permissions is not None:
+                    repository['permissions'] = permissions
+                with self.subTest(permissions=permissions, status=status), patch.dict(
+                        os.environ, GITHUB_ACTIONS='true', GITHUB_REPOSITORY=release.REPOSITORY), patch.object(
+                        release, 'api', side_effect=[repository, None, release.ReleaseError(f'HTTP {status}')]) as api:
+                    with self.assertRaisesRegex(release.ReleaseError, 'local-only'):
+                        release.ensure_available(TAG, COMMIT)
+                self.assertEqual(api.call_count, 3)
+                self.assertTrue(api.call_args.args[0].endswith('/releases/generate-notes'))
+
+    def test_installation_token_without_user_permissions_can_verify_write_access(self):
+        responses = [{'full_name': release.REPOSITORY}, None,
+                     {'name': 'Synthetic release', 'body': 'PRIVATE-NOTES-MUST-NOT-BE-PRINTED'}, []]
+        with patch.object(release, 'api', side_effect=responses) as api:
+            self.assertIsNone(release.ensure_available(TAG, COMMIT))
+        probe = api.call_args_list[2]
+        self.assertEqual(probe.args, (f'repos/{release.REPOSITORY}/releases/generate-notes',))
+        self.assertEqual(probe.kwargs, {'method': 'POST', 'expected_status': 200,
+                                       'fields': (('tag_name', TAG), ('target_commitish', COMMIT))})
+        self.assertEqual(api.call_count, 4)
+
+    def test_permission_check_rejects_wrong_repository_and_invalid_response(self):
+        for repository in ({}, {'full_name': 'other/repository'}, []):
+            with patch.object(release, 'api', return_value=repository) as api:
+                with self.assertRaisesRegex(release.ReleaseError, 'identity'):
+                    release.ensure_available(TAG, COMMIT)
+            self.assertEqual(api.call_count, 1)
+        for notes in (None, [], {}, {'name': 'release'}, {'name': 'release', 'body': False}):
+            with patch.object(release, 'api', side_effect=[{'full_name': release.REPOSITORY}, None, notes]) as api:
+                with self.assertRaisesRegex(release.ReleaseError, 'permission check'):
+                    release.ensure_available(TAG, COMMIT)
+            self.assertEqual(api.call_count, 3)
+
+    def test_generate_notes_requires_exact_200_without_relaxing_create_status(self):
+        result = subprocess.CompletedProcess([], 0, 'HTTP/2.0 200 OK\n\n{"name":"release","body":""}', '')
+        with patch.object(release, 'run_gh', return_value=result):
+            self.assertEqual(release.api('repos/test/releases/generate-notes', method='POST',
+                                         expected_status=200), {'name': 'release', 'body': ''})
+            with self.assertRaisesRegex(release.ReleaseError, 'HTTP 200'):
+                release.api('repos/test/git/refs', method='POST')
+        for code in (201, 204, 401, 403, 404):
+            result = subprocess.CompletedProcess([], 0, f'HTTP/2.0 {code} Result\n\n{{}}', '')
+            with patch.object(release, 'run_gh', return_value=result):
+                with self.assertRaisesRegex(release.ReleaseError, f'HTTP {code}'):
+                    release.api('repos/test/releases/generate-notes', method='POST', expected_status=200)
 
     def test_existing_tag_stops_before_release_list(self):
         with patch.object(release, 'api', side_effect=[
                 {'full_name': release.REPOSITORY, 'permissions': {'push': True}}, {'ref': TAG}]) as api:
             with self.assertRaisesRegex(release.ReleaseError, 'tag already exists'):
-                release.ensure_available(TAG)
+                release.ensure_available(TAG, COMMIT)
         self.assertEqual(api.call_count, 2)
 
     def test_paginated_existing_draft_is_rejected(self):
         pages = [
             {'full_name': release.REPOSITORY, 'permissions': {'push': True}}, None,
+            {'name': 'Synthetic', 'body': ''},
             [{'tag_name': f'v0.0.{index}', 'draft': False} for index in range(100)],
             [{'tag_name': TAG, 'draft': True}],
         ]
         with patch.object(release, 'api', side_effect=pages) as api:
             with self.assertRaisesRegex(release.ReleaseError, 'draft or published'):
-                release.ensure_available(TAG)
+                release.ensure_available(TAG, COMMIT)
         self.assertIn('page=2', api.call_args_list[-1].args[0])
 
-    def test_full_check_only_uses_get(self):
+    def test_full_check_uses_only_reads_and_non_persisting_permission_probe(self):
         responses = [
-            {'full_name': release.REPOSITORY, 'permissions': {'push': True}},
-            None, [],
+            {'full_name': release.REPOSITORY, 'permissions': {'push': True}}, None,
+            {'name': 'Synthetic', 'body': ''}, [],
         ]
         with patch.object(release, 'validate_source', return_value={}), patch.object(
                 release, 'api', side_effect=responses) as api:
             result = release.check(TAG, COMMIT)
         self.assertEqual(result['remote_availability'], 'available')
-        self.assertTrue(all(call.kwargs.get('method', 'GET') == 'GET' for call in api.call_args_list))
+        posts = [call for call in api.call_args_list if call.kwargs.get('method', 'GET') != 'GET']
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0].args, (f'repos/{release.REPOSITORY}/releases/generate-notes',))
+        self.assertEqual(posts[0].kwargs['method'], 'POST')
 
     def test_subprocess_uses_argv_and_fixed_host(self):
         result = subprocess.CompletedProcess([], 0, '', '')

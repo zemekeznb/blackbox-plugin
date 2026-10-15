@@ -46,7 +46,7 @@ def run_gh(arguments):
         raise ReleaseError('GitHub CLI did not complete; remote outcome may be unknown.') from exc
 
 
-def api(endpoint, *, method='GET', fields=(), allow_missing=False):
+def api(endpoint, *, method='GET', fields=(), allow_missing=False, expected_status=None):
     arguments = ['api', '--hostname', 'github.com', '--include', '--method', method,
                  '-H', 'Accept: application/vnd.github+json',
                  '-H', 'X-GitHub-Api-Version: 2022-11-28', endpoint]
@@ -60,7 +60,8 @@ def api(endpoint, *, method='GET', fields=(), allow_missing=False):
     code = int(status[1])
     if allow_missing and method == 'GET' and code == 404:
         return None
-    if result.returncode or code != (201 if method == 'POST' else 200):
+    expected = expected_status if expected_status is not None else (201 if method == 'POST' else 200)
+    if result.returncode or code != expected:
         raise ReleaseError(f'GitHub request failed (HTTP {code}); stopping.')
     try:
         return read_json(body.encode('utf-8'))
@@ -116,15 +117,26 @@ def releases():
         page += 1
 
 
-def ensure_available(tag):
+def ensure_available(tag, commit):
     repository = api(f'repos/{REPOSITORY}')
-    if (not isinstance(repository, dict) or repository.get('full_name') != REPOSITORY
-            or not isinstance(repository.get('permissions'), dict)
-            or repository['permissions'].get('push') is not True):
-        raise ReleaseError('Full preflight needs authenticated push access to see drafts. '
-                           'Use check --local-only with a read-only CI token.')
+    if not isinstance(repository, dict) or repository.get('full_name') != REPOSITORY:
+        raise ReleaseError('GitHub repository identity could not be verified; stopping.')
     if api(f'repos/{REPOSITORY}/git/ref/tags/{tag}', allow_missing=True) is not None:
         raise ReleaseError('Remote tag already exists; it will not be moved or reused.')
+    # Installation tokens (including GITHUB_TOKEN) need not expose the user's
+    # permissions.push field. Verify the credential's actual Contents(write)
+    # capability instead: generate-notes requires that permission but does not
+    # save its output or create a tag/release. Discard the generated text.
+    # https://docs.github.com/en/rest/releases/releases#generate-release-notes-content-for-a-release
+    try:
+        notes = api(f'repos/{REPOSITORY}/releases/generate-notes', method='POST',
+                    fields=(('tag_name', tag), ('target_commitish', commit)), expected_status=200)
+    except ReleaseError as exc:
+        raise ReleaseError('Full preflight needs verified Contents write access to see drafts. '
+                           'Use check --local-only with a read-only CI token. ' + str(exc)) from exc
+    if (not isinstance(notes, dict) or not isinstance(notes.get('name'), str)
+            or not isinstance(notes.get('body'), str)):
+        raise ReleaseError('GitHub did not confirm the non-persisting release permission check; stopping.')
     if any(item['tag_name'] == tag for item in releases()):
         raise ReleaseError('A draft or published Release already uses this tag; it will not be changed.')
 
@@ -132,7 +144,7 @@ def ensure_available(tag):
 def check(tag, commit, *, root=ROOT, local_only=False):
     result = validate_source(tag, commit, root)
     if not local_only:
-        ensure_available(tag)
+        ensure_available(tag, commit)
     return dict(result, remote_availability='not_checked' if local_only else 'available',
                 checks_only=True)
 
@@ -209,7 +221,7 @@ def create_draft(tag, commit, artifacts, *, root=ROOT):
             encoding='utf-8')
         # Repeat local evidence immediately before the remote checks and mutation.
         validate_source(tag, commit, root)
-        ensure_available(tag)
+        ensure_available(tag, commit)
         try:
             ref = api(f'repos/{REPOSITORY}/git/refs', method='POST', fields=(
                 ('ref', 'refs/tags/' + tag), ('sha', commit)))
