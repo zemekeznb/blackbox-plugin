@@ -90,9 +90,9 @@ Release .45 rechecks old conversation identity caches. Events whose identity can
 
 ## Current limits and verification
 
-- This Alpha targets **Codex desktop on Windows**. CLI product support is deferred. The minimum Codex version, a clean Windows computer/account, and API-key login mode have not completed dedicated validation.
+- This Alpha targets **Codex desktop on Windows**. Codex CLI, Linux/macOS, and other Agent hosts have not completed product adaptation. The minimum Codex version, a clean Windows computer/account, and API-key login mode have not completed dedicated validation.
 - Blackbox cannot reconstruct events the host never delivered. Mixed output, silent failures, and some non-Bash/MCP failures can be missed. Printed diagnostic text can also produce false positives; inspect the actual execution evidence.
-- Installation checks, offline rule tests, read-only metadata checks, and real desktop Hook delivery are separate evidence. Local user feedback does not replace independent-user, clean-machine, or long-term validation. See the [current verification status](../current-status.md) (Chinese) for version-specific evidence.
+- Installation checks, offline rule tests, read-only metadata checks, and real desktop Hook delivery are separate evidence. Local user feedback does not replace independent-user, clean-machine, or long-term validation. Automated source checks are available in [GitHub Actions](https://github.com/zemekeznb/blackbox-plugin/actions/workflows/alpha.yml) for the corresponding commit; passing CI does not verify recording in your environment.
 - Updates during a long-running conversation may leave gaps. When a full reload is requested, save your work, quit and reopen Codex, and verify a real record again. Missing events are not fabricated or backfilled.
 
 ## Documentation and feedback
@@ -104,7 +104,6 @@ Release .45 rechecks old conversation identity caches. Events whose identity can
 | [Instructions for Codex](../../release/INSTALL-CODEX.md) (Chinese) | The installation procedure followed by the assistant |
 | [Development and validation](../DEVELOPMENT.md) (Chinese) | Tests, packaging, CI, and release procedures |
 | [Architecture](../architecture.md) (Chinese) | Data flow, storage, permissions, and component boundaries |
-| [Current status](../current-status.md) · [Development plan](../development-plan.md) (Chinese) | Evidence, remaining validation, and planned work |
 | [GitHub Issues](https://github.com/zemekeznb/blackbox-plugin/issues) | Bug reports and feedback |
 
 When reporting a problem, include the version, steps, and a redacted error message. Distinguish installation failure, a page that will not open, and an enabled project with no received record. Do not upload the full database, private conversation text, keys, or account credentials.
@@ -113,4 +112,4 @@ When reporting a problem, include the version, steps, and a redacted error messa
 
 The current repository source is licensed under the [MIT License](../../LICENSE). Third-party materials retain their original licenses; the interface's Sora glyph attribution and SIL Open Font License are preserved in [review.css](../../plugins/blackbox/assets/review.css#L311).
 
-Blackbox remains an Alpha release. This documentation and licensing update does not rebuild or replace the previously published `v0.4.0-alpha.6.45` package, tag, or release attachments.
+Blackbox remains an Alpha release. The published `v0.4.0-alpha.6.45` installation package and its checksum are preserved. Repository documentation and history cleanup does not rebuild that package or change an already installed plugin; the release manifest retains its original build provenance. See [Development and validation](../DEVELOPMENT.md) for the distinction between published artifacts and cleaned source history.

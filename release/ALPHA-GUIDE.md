@@ -4,7 +4,7 @@ Blackbox 面向 Windows 版 Codex 桌面端，为明确启用的项目保存宿�
 
 ## 使用前了解
 
-- 需要 Windows 版 Codex 桌面端与宿主可调用的 Python 3.11+。Codex CLI 使用支持后续再补；最低 Codex 版本、干净电脑及 API Key 登录模式尚未完成专项验收。
+- 需要 Windows 版 Codex 桌面端与宿主可调用的 Python 3.11+。Codex CLI、Linux/macOS 及其他 Agent 宿主尚未完成产品适配；最低 Codex 版本、干净 Windows 电脑/账户及 API Key 登录模式尚未完成专项验收。
 - 项目采用 [MIT 许可证](../LICENSE)，仍处于 Alpha 试用阶段；第三方字体保留其[原有许可声明](../plugins/blackbox/assets/review.css)。
 - 安装、启用项目、Hook 已信任与真实记录收到是不同状态。只有实际核验命令记录送达，才算完成该项目的接入。
 
@@ -44,10 +44,10 @@ Codex 内 Blackbox 页面的“保存到下载文件夹”会将已预览并校�
 
 ## 当前限制与反馈
 
-- 安装、准入规则的离线验证和用户实际桌面复测是独立证据；.45 复测交付后用户已反馈目前无问题，逐项 Hook 回执与完整步骤尚未独立核对，详见[当前进展](../docs/current-status.md)。
+- 安装校验、离线规则测试、只读元数据查询和真实 Hook 投递分别验证。用户反馈或自动化测试通过不能替代独立用户、干净电脑与长期自然使用验收。
 - 更新插件后，正在执行的长回合可能出现投递缺口。需要重开时，保存工作并完整退出 Codex，再继续验证真实记录；不会补造期间未收到的事件。
 - 混合输出、静默失败和部分非 Bash/MCP 失败存在漏记边界；完整打印的诊断文本也可能误报。识别结果不能替代对实际执行情况的核查。
 
 遇到问题时，向执行安装或接入的 Codex 会话提供版本、操作步骤和脱敏后的具体报错，区分“无法安装”“界面未打开”和“项目已启用但无回执”。不要直接上传完整数据库或凭据。
 
-最新验证状态见[当前进展](../docs/current-status.md)；开发测试和构建方法见[开发与验证](../docs/DEVELOPMENT.md)。
+源码自动化检查见对应提交的 [GitHub Actions](https://github.com/zemekeznb/blackbox-plugin/actions/workflows/alpha.yml)；测试和构建方法见[开发与验证](../docs/DEVELOPMENT.md)。离线 CI 不证明用户环境中的真实采集已生效。

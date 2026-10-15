@@ -1,6 +1,6 @@
 # Blackbox Plugin 系统架构
 
-更新：2026-10-15。本文以 **0.4.0-alpha.6.45** 源码为基线，描述当前实现；安装与真实宿主采集的验证范围见[当前状态](current-status.md)。
+更新：2026-10-15。本文以 **0.4.0-alpha.6.45** 源码为基线，描述当前实现；支持范围与已知限制见[使用与隐私](../release/ALPHA-GUIDE.md)，自动化复现方法见[开发与验证](DEVELOPMENT.md)。
 
 Blackbox 当前上线面向 **Windows 版 Codex 桌面端**，在用户明确启用的项目中保存获授权的可见事件，再按确定性规则呈现执行异常和保守关联的后续调用。会话准入仅接收经确认的持久桌面来源，拒收终端 CLI；CLI 产品适配与完整验收留待后续。没有中央服务、额外模型调用或自动上传；不控制 Agent loop，不读取隐藏推理，不推断根因、责任或修复成功。
 
@@ -25,7 +25,7 @@ Codex 内 MCP 页面 / 回环 HTTP 阅读器 → Markdown 快照
 
 Hook 配置包含 `SessionStart`、`UserPromptSubmit`、`PostToolUse`、`Stop`、`PreCompact`、`PostCompact`、`SessionEnd`、`Interrupt`。这表示配置的接收入口，不证明宿主在所有情况下都投递这些事件。宿主未送达的信息无法补回。
 
-当前身份为插件 `blackbox@personal`、技能 `blackbox-setup` / `blackbox-review`、入口 `plugins/blackbox/scripts/blackbox.py`。旧名称只用于兼容输入和历史证据，迁移决定见 [ADR-N006](decisions/ADR-N006-blackbox-identity.md)。安装操作见[安装指南](../release/INSTALL.md)，发行与测试见[开发说明](DEVELOPMENT.md)。
+当前身份为插件 `blackbox@personal`、技能 `blackbox-setup` / `blackbox-review`、入口 `plugins/blackbox/scripts/blackbox.py`。旧名称只用于兼容输入和历史来源，具体行为见下文[身份与迁移兼容](#身份与迁移兼容)。安装操作见[安装指南](../release/INSTALL.md)，发行与测试见[开发说明](DEVELOPMENT.md)。
 
 ## 模块索引
 
@@ -61,7 +61,18 @@ Hook 配置包含 `SessionStart`、`UserPromptSubmit`、`PostToolUse`、`Stop`�
 
 输入大小、字段、会话及数据库容量均有保护；达到上限会拒收相应新事件并尽力留下不含正文的诊断，不自行淘汰旧记录。具体容量以源码常量及状态接口为准。采集缺口写入后续来源的连续性标记，关联不会跨越已知缺口；数据库锁或诊断持久化失败时仍只能尽力处理，不能承诺持续健康。
 
-状态目录优先级为显式 `--state-dir`、`BLACKBOX_STATE_DIR`、兼容变量 `TAS_NOTES_STATE_DIR`、默认 `%LOCALAPPDATA%\Blackbox`。仅有旧默认目录时继续兼容；显式初始化可按 ADR-N006 迁移并保留旧路径别名，不合并两个库、不搬迁自定义目录。Windows 打包应用可能重定向路径，运行时以实际文件/目录句柄解析结果为准。数据目录不得位于已启用的项目内。
+状态目录优先级为显式 `--state-dir`、`BLACKBOX_STATE_DIR`、兼容变量 `TAS_NOTES_STATE_DIR`、默认 `%LOCALAPPDATA%\Blackbox`。Windows 打包应用可能重定向路径，运行时以实际文件/目录句柄解析结果为准。数据目录不得位于已启用的项目内。
+
+## 身份与迁移兼容
+
+技术身份与文案分开处理：源码、插件和技能使用 Blackbox；`tas-notes@personal`、`TAS_NOTES_STATE_DIR`、旧默认目录 `TAS Notes` 和旧阅读服务身份只作为兼容输入，不再建立第二套旧名称技能。
+
+- **数据目录：** 仅有旧默认目录时继续使用。显式 `configure-runtime` 可以将实际旧默认目录改名为 `Blackbox` 并保留旧路径别名；不迁移自定义路径，也不复制或合并两个库。新旧默认目录同时存在且指向不同位置时要求明确选择。
+- **迁移失败：** 正在运行的阅读服务会阻止目录迁移。改名失败保留旧数据；创建兼容别名失败尝试回滚，并报告未完成状态。不能把部分完成当作成功。
+- **插件登记：** 完整安装通过官方 CLI 先退役旧插件再安装新插件；图形首次设置先核验新安装，再退役旧插件。保留停用偏好，重试所需状态写入本机迁移回执。
+- **配置与历史：** 不修改模型、provider 或凭据配置；必要时仅把新插件的 `enabled` 恢复为 `false`。接受旧健康协议身份，新服务输出 Blackbox。历史事件、备份格式、总结和人工版本不因更名改写。
+
+上述兼容逻辑位于 `blackbox_compat.py`、`blackbox_install.py` 和 `blackbox_launcher.py`。完整宿主重开后仍须验证真实记录送达，不能把迁移成功等同于采集成功。
 
 ## 阅读、快照与管理
 
@@ -89,4 +100,4 @@ HTTP 只监听 `127.0.0.1`，使用随机令牌、Host/Origin 校验、CSP 和�
 
 - 实际可记录范围取决于宿主投递。静默失败、混合输出、内部重试及所测非 Bash/MCP 失败有漏记边界；打印的完整诊断也可能误报。“暂无异常”不代表没有失败。
 - 安装校验、协议夹具、模拟 Hook 和既往版本的验收，不能代替当前版本在新用户桌面会话中的真实采集回执。更新中的长回合不保证热加载无损。
-- 当前上线范围为 Windows 版 Codex 桌面端，CLI 支持后续另行验收。最低宿主版本、干净 Windows 环境、API Key 登录的完整链路及后续方向见[当前状态](current-status.md)和[开发计划](development-plan.md)。
+- 当前上线范围为 Windows 版 Codex 桌面端，CLI 和其他平台支持需另行验收。最低宿主版本、干净 Windows 环境和 API Key 登录的完整链路尚未完成专项验收；用户操作及限制见[使用与隐私](../release/ALPHA-GUIDE.md)。

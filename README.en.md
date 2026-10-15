@@ -87,7 +87,6 @@ Read the recording scope in the prompt, then copy and send it to a **Codex deskt
 | [使用与隐私 / Usage and privacy](release/ALPHA-GUIDE.md) (中文) | Recording scope, backups, exports and limitations |
 | [Development and releases](docs/DEVELOPMENT.md) (中文) | Local tests, candidate builds, CI and version delivery |
 | [Architecture and boundaries](docs/architecture.md) (中文) | Session admission, storage, error recognition and data management |
-| [Current status](docs/current-status.md) · [Development plan](docs/development-plan.md) (中文) | Verified scope, pending checks and future directions |
 | [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) · [Issues](https://github.com/zemekeznb/blackbox-plugin/issues) | Published packages, updates and issue tracking |
 
 ## Feedback

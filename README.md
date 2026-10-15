@@ -87,7 +87,6 @@ Codex 会检查依赖、下载并校验插件、完成安装与初始化，然�
 | [English guide](docs/en/README.md) | Installation, project setup, usage, privacy and troubleshooting |
 | [开发与发布](docs/DEVELOPMENT.md) | 本地测试、候选构建、CI 与版本交付 |
 | [架构与边界](docs/architecture.md) | 会话准入、事件存储、异常识别与数据管理 |
-| [当前进展](docs/current-status.md) · [开发计划](docs/development-plan.md) | 已验证范围、待验收项与后续方向 |
 | [版本记录](https://github.com/zemekeznb/blackbox-plugin/releases) · [问题反馈](https://github.com/zemekeznb/blackbox-plugin/issues) | 已发布安装包、更新与问题跟踪 |
 
 ## 反馈
