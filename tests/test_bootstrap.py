@@ -141,9 +141,9 @@ class BootstrapTests(unittest.TestCase):
             if name == failure:
                 raise bb.SetupError('fixture failure')
             if name == 'blackbox_preflight.py':
-                return {'ok': True, 'state_directory': str(self.root/'state')}
+                return {'ok': True, 'state_directory': str(self.root/'state'), 'warnings': ['Host startup pending.']}
             if name == 'blackbox.py':
-                return {'runtime_configured': True}
+                return {'runtime_configured': True, 'host_bound': True}
             return {'registration': 'verified', 'installed_path': str(self.root/'cache')}
 
         with patch.object(bb, 'find_codex', return_value='codex.exe'), patch.object(bb.Path, 'home', return_value=self.root), patch.object(bb, 'download', side_effect=[(digest+'  '+stem).encode(), data]), patch.object(bb, 'helper', side_effect=run):
@@ -167,6 +167,11 @@ class BootstrapTests(unittest.TestCase):
         result, calls = self.installation()
         self.assertTrue(result['installed'])
         self.assertEqual('not_verified', result['capture'])
+        self.assertTrue(result['host_bound'])
+        self.assertEqual('not_verified', result['host_mcp'])
+        self.assertEqual('not_verified', result['sidebar'])
+        self.assertEqual(['Host startup pending.'], result['warnings'])
+        self.assertIn('--bind-host', calls[2][1])
         self.assertEqual(['blackbox_preflight.py', 'blackbox_install.py', 'blackbox.py', 'blackbox_install.py'], [name for name, _ in calls])
         self.assertFalse(any(arg in ('enable', 'hook', 'trust') for _, args in calls for arg in args))
 

@@ -29,7 +29,7 @@ SCRIPT_NAMES = (
     'blackbox_mcp.py', 'blackbox_shell_errors.py', 'blackbox_sse_errors.py',
     'blackbox_admission.py', 'blackbox_preflight.py', 'blackbox_sessions.py', 'blackbox_cleanup.py',
     'blackbox_summary.py', 'blackbox_transport_errors.py', 'blackbox_web.py', 'blackbox_install.py', 'blackbox_compat.py',
-    'launch.cmd', 'install_shortcuts.ps1',
+    'launch.cmd', 'launch-legacy.cmd', 'mcp.cmd', 'blackbox_runtime.py', 'blackbox_runtime.ps1', 'install_shortcuts.ps1',
 )
 ASSET_NAMES = ('anomalies.html', 'anomalies.js', 'mcp-reader.js', 'review.css',
                'review.html', 'review.js')

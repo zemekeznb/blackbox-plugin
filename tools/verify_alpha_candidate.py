@@ -187,7 +187,8 @@ def smoke_test(manifest, files):
         package, state = root / '候选 插件 with spaces', root / '隔离 状态'
         extract_verified(files, package)
         entry = package / PLUGIN / 'scripts/blackbox.py'
-        environment = dict(os.environ, BLACKBOX_STATE_DIR=str(state), PYTHONDONTWRITEBYTECODE='1')
+        environment = dict(os.environ, BLACKBOX_STATE_DIR=str(state), PYTHONDONTWRITEBYTECODE='1',
+                           CODEX_HOME=str(root / 'isolated-host'))
         environment.pop('PYTHONPATH', None)
         environment.pop('PYTHONHOME', None)
 
@@ -210,19 +211,57 @@ def smoke_test(manifest, files):
             return data
 
         started = False
+        mcp_result = 'not_tested'
         try:
-            command('configure-runtime')
+            bound_runtime = os.name == 'nt' and PLUGIN + 'scripts/blackbox_runtime.py' in files
+            setup_args = ('configure-runtime', '--bind-host') if bound_runtime else ('configure-runtime',)
+            configured = command(*setup_args)
+            if bound_runtime and configured.get('host_bound') is not True:
+                raise VerificationError('Candidate did not confirm its persistent host runtime.')
             initial = command('status')
             if (initial.get('runtime', {}).get('state') != 'configured'
                     or initial.get('record_count') != 0 or initial.get('projects') != []):
                 raise VerificationError('Fresh candidate state is unexpectedly configured or populated.')
             database = state / 'notes.sqlite3'
             before = hashlib.sha256(database.read_bytes()).hexdigest()
-            command('configure-runtime')
+            command(*setup_args)
             repeated = command('status')
             if (hashlib.sha256(database.read_bytes()).hexdigest() != before
                     or repeated.get('record_count') != initial['record_count']):
                 raise VerificationError('Repeating runtime configuration changed the recording database.')
+            if bound_runtime:
+                # Exercise the shipped launch command, rather than bypassing it
+                # with the test runner's Python. Simulate a later host process
+                # with no PATH Python and a different LOCALAPPDATA view.
+                mcp_environment = dict(environment, LOCALAPPDATA=str(root / 'other-appdata'),
+                                       PATH=str(Path(os.environ['SystemRoot']) / 'System32'))
+                mcp_environment.pop('BLACKBOX_STATE_DIR', None)
+                mcp_environment.pop('TAS_NOTES_STATE_DIR', None)
+                plugin = package / PLUGIN
+                launch = read_json((plugin / '.mcp.json').read_bytes())['mcpServers']['blackbox_reader']
+                requests = [
+                    {'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-11-25'}},
+                    {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list', 'params': {}},
+                    {'jsonrpc': '2.0', 'id': 3, 'method': 'tools/call',
+                     'params': {'name': 'read_view', 'arguments': {'path': '/api/status'}}},
+                ]
+                try:
+                    mcp = subprocess.run([launch['command'], *launch['args']], cwd=plugin,
+                        env=mcp_environment, input=('\n'.join(json.dumps(row) for row in requests) + '\n').encode(),
+                        capture_output=True, timeout=25, creationflags=subprocess.CREATE_NO_WINDOW)
+                    replies = {row['id']: row['result'] for row in map(json.loads, mcp.stdout.splitlines())}
+                    entrypoint = next(tool for tool in replies[2]['tools'] if tool['name'] == 'open_reader')
+                    status = replies[3]['_meta']['blackbox']
+                    valid = (mcp.returncode == 0 and not mcp.stderr and
+                             entrypoint['_meta']['openai/ui']['entrypoints'] == [{'type': 'global'}, {'type': 'thread'}] and
+                             status['status'] == 200 and status['body']['projects'] == [] and
+                             status['body']['record_count'] == 0 and
+                             Path(status['body']['application']['state_directory']).resolve() == state.resolve())
+                except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, StopIteration) as error:
+                    raise VerificationError('Candidate MCP launch/handshake with saved runtime failed; output omitted.') from error
+                if not valid or (root / 'other-appdata').exists():
+                    raise VerificationError('Candidate MCP did not reuse the bound state without PATH Python.')
+                mcp_result = 'passed_without_path_python'
             # Set before launching: a timeout or invalid response can still leave
             # a service behind, which must be stopped using this isolated state.
             started = True
@@ -262,7 +301,7 @@ def smoke_test(manifest, files):
                 if not stopped.get('stopped') and stopped.get('reason') != 'not_running':
                     raise VerificationError('Isolated reader did not confirm shutdown.')
         return {'runtime_configuration': 'passed', 'repeat_configuration_preserved_database': True,
-                'reader_health_and_page': 'passed', 'reader_shutdown': 'passed',
+                'reader_health_and_page': 'passed', 'reader_shutdown': 'passed', 'mcp_configured_launch': mcp_result,
                 'projects_enabled': 0, 'record_count': 0,
                 'synthetic_hooks_used': False, 'real_host_acceptance': 'not_tested'}
 

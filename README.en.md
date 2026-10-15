@@ -45,7 +45,9 @@ Please install and initialize Blackbox by following https://github.com/zemekeznb
 ```
 <!-- blackbox:published:end -->
 
-Codex checks dependencies, downloads and verifies the plugin, installs it, initializes the local runtime and opens Blackbox. **Installation does not enable project recording.** If the plugin has not loaded, follow the instructions to start a new conversation or, when needed, save your work and fully restart Codex. See the [user guide](docs/en/README.md) for troubleshooting. The installation instructions read by Codex and the current interface are in Chinese.
+Codex checks dependencies, downloads and verifies the plugin, installs it, initializes the local runtime, and reports native entry and page-opening results separately. **Installation does not enable project recording.** See the [user guide](docs/en/README.md) for troubleshooting. The installation instructions read by Codex and the current interface are in Chinese.
+
+**Known issue in .45:** A desktop backend without a working Python command can show the plugin as installed while its sidebar entry is missing. Finding Python temporarily in a conversation or opening the local web page does not verify the native entry. The runtime-binding fix is not yet released. Keep the specific error; do not repeatedly reinstall or switch data directories.
 
 ## What it helps with
 
@@ -59,11 +61,11 @@ Codex checks dependencies, downloads and verifies the plugin, installs it, initi
 
 ## Review and export
 
-After installation and initialization, find and click **Blackbox** in the **Codex desktop sidebar** to open your records.
+Click **Blackbox** in the **Codex desktop sidebar** to open your records. The official plugin's page service must load successfully for this entry to appear; installation and initialization alone do not confirm that it is available.
 
 Choose a project, session and error to inspect saved commands, results and associated follow-up calls. Filter records and export a Markdown snapshot when needed.
 
-Alternatively, send “Open Blackbox.” in a Codex desktop conversation and ask Codex to open it for you.
+Alternatively, send “Open Blackbox.” in a Codex desktop conversation and ask Codex to open it for you. If Codex opens the local web page in its browser, report that separately; it does not confirm that the sidebar entry works.
 
 ![Blackbox export preview: review the full Markdown content before saving to Downloads](docs/images/export-preview.png)
 

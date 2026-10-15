@@ -1,1 +1,1 @@
-{"mcpServers":{"blackbox_reader":{"command":"python","args":["-I","scripts/blackbox_mcp.py"],"cwd":".","startup_timeout_sec":15}}}
+{"mcpServers":{"blackbox_reader":{"command":"cmd.exe","args":["/d","/c","scripts\\mcp.cmd"],"cwd":".","startup_timeout_sec":15}}}

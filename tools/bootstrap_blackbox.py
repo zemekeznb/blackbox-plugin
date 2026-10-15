@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-VERSION = '0.4.0-alpha.6.45'
+VERSION = '0.4.0-alpha.6.46'
 REPOSITORY = 'https://github.com/zemekeznb/blackbox-plugin'
 MAX_BYTES = 32 * 1024 * 1024
 
@@ -174,8 +174,8 @@ def install():
     root = prepare(files, Path.home() / 'Blackbox-install' / VERSION)
     checked = helper(root, 'blackbox_preflight.py', '--plugin-root', root / 'plugins/blackbox', '--json')
     helper(root, 'blackbox_install.py', '--root', root, '--codex', executable, '--replace-source')
-    configured = helper(root, 'blackbox.py', '--state-dir', checked['state_directory'], 'configure-runtime')
-    if configured.get('runtime_configured') is not True:
+    configured = helper(root, 'blackbox.py', '--state-dir', checked['state_directory'], 'configure-runtime', '--bind-host')
+    if configured.get('runtime_configured') is not True or configured.get('host_bound') is not True:
         raise SetupError('Runtime configuration was not confirmed.')
     try:
         registered = helper(root, 'blackbox_install.py', '--root', root, '--codex', executable,
@@ -185,7 +185,11 @@ def install():
     except SetupError as error:
         raise SetupError('Runtime configured; registration incomplete. Existing data retained. ' + str(error)) from None
     return {'installed': True, 'version': VERSION, 'installed_path': registered['installed_path'],
-            'runtime_configured': True, 'capture': 'not_verified', 'project_opt_in': 'not_changed',
+            'runtime_configured': True, 'host_bound': True,
+            'state_directory': configured.get('state_directory', checked['state_directory']),
+            'host_mcp': 'not_verified', 'sidebar': 'not_verified',
+            'warnings': checked.get('warnings', []),
+            'capture': 'not_verified', 'project_opt_in': 'not_changed',
             'hook_trust': 'not_changed', 'next': 'Read installed blackbox-setup, then open with blackbox-review. Reload Codex only if required.'}
 
 

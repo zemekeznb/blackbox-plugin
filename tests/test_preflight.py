@@ -25,10 +25,6 @@ class PreflightTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
         self.state = self.root / 'state'
-        self.path_patch = patch.object(preflight, 'inspect_path_python', return_value={
-            'executable': sys.executable, 'version': list(sys.version_info[:3])})
-        self.path_patch.start()
-        self.addCleanup(self.path_patch.stop)
         self.platform_patch = patch.object(preflight.platform, 'system', return_value='Windows')
         self.platform_patch.start()
         self.addCleanup(self.platform_patch.stop)
@@ -40,7 +36,9 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(result['host_plugin_registration'], 'not_checked')
         self.assertEqual(result['host_capture'], 'not_checked')
         self.assertEqual(result['minimum_python'], '3.11')
-        self.assertTrue(any('BLACKBOX_STATE_DIR' in item for item in result['warnings']))
+        self.assertTrue(any('--bind-host' in item for item in result['warnings']))
+        self.assertEqual(result['host_mcp'], 'not_checked')
+        self.assertEqual(result['runtime_binding'], 'not_written')
 
     def test_required_package_files_and_manifest_fail_helpfully(self):
         package = self.root / 'incomplete'
@@ -63,32 +61,14 @@ class PreflightTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertTrue(any('Windows only' in item for item in result['errors']))
 
-    def test_path_python_is_required_independently_of_selected_python(self):
-        with patch.object(preflight, 'inspect_path_python', side_effect=ValueError('MCP requires python on PATH.')):
-            result = preflight.preflight(PLUGIN, self.state)
-        self.assertFalse(result['ok'])
-        self.assertIn('MCP requires python on PATH.', result['errors'])
-        with patch.object(preflight, 'inspect_path_python', return_value={
-                'executable': str(self.root / 'another-python.exe'), 'version': [3, 12, 0]}):
-            result = preflight.preflight(PLUGIN, self.state)
-        self.assertTrue(result['ok'], result['errors'])
-        self.assertTrue(any('differs' in item for item in result['warnings']))
-
-    def test_path_probe_handles_aliases_timeouts_and_old_python(self):
-        self.path_patch.stop()
-        with patch.object(preflight.shutil, 'which', return_value=None):
-            with self.assertRaisesRegex(ValueError, 'PATH'):
-                preflight.inspect_path_python()
-        cases = [subprocess.CompletedProcess([], 1, 'not json', ''),
-                 subprocess.CompletedProcess([], 0, '{"version":[3,10,0],"executable":"old"}', '')]
-        with patch.object(preflight.shutil, 'which', return_value='python'):
-            for returned in cases:
-                with patch.object(preflight.subprocess, 'run', return_value=returned):
-                    with self.assertRaisesRegex(ValueError, 'Correct PATH'):
-                        preflight.inspect_path_python()
-            with patch.object(preflight.subprocess, 'run', side_effect=subprocess.TimeoutExpired('python', 10)):
-                with self.assertRaisesRegex(ValueError, 'Correct PATH'):
-                    preflight.inspect_path_python()
+    def test_selected_interpreter_does_not_require_a_path_python(self):
+        for path in ('', str(self.root / 'unusable-app-alias')):
+            with patch.dict(os.environ, {'PATH': path}):
+                result = preflight.preflight(PLUGIN, self.state)
+            self.assertTrue(result['ok'], result['errors'])
+            self.assertEqual(result['python'], sys.executable)
+            self.assertEqual(result['mcp_launch'], 'configured_absolute_python')
+            self.assertFalse(self.state.exists())
 
     def test_existing_database_checked_without_changing_bytes(self):
         Store(self.state)

@@ -9,25 +9,51 @@ import time
 import hashlib
 import http.client
 import re
+import errno
 from contextlib import contextmanager
 
 _owned_children = {}
 
 
+@contextmanager
+def _os_error_stage(stage):
+    """Attach a fixed internal stage without changing the original OS error."""
+    try:
+        yield
+    except OSError as error:
+        error._blackbox_stage = stage
+        raise
+
+
+def _win32_error(stage, error_code=None):
+    import ctypes
+    # Capture GetLastError before another Windows call can overwrite it. The
+    # exception text is never printed by the CLI; the numeric codes are useful.
+    code = ctypes.get_last_error() if error_code is None else error_code
+    error = ctypes.WinError(code)
+    error._blackbox_stage = stage
+    return error
+
+
 def physical_file_path(path):
     """Resolve MSIX file virtualization through an actual open file handle."""
     if os.name != 'nt':
-        return str(Path(path).resolve(strict=True))
+        with _os_error_stage('physical_file_resolve'):
+            return str(Path(path).resolve(strict=True))
     import ctypes
     import msvcrt
     api = ctypes.WinDLL('kernel32', use_last_error=True).GetFinalPathNameByHandleW
     api.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32]
     api.restype = ctypes.c_uint32
-    with Path(path).open('rb') as stream:
+    with _os_error_stage('physical_file_open'):
+        stream = Path(path).open('rb')
+    with stream:
         buffer = ctypes.create_unicode_buffer(32768)
         size = api(msvcrt.get_osfhandle(stream.fileno()), buffer, len(buffer), 0)
-        if not size or size >= len(buffer):
-            raise OSError('cannot resolve physical launcher path')
+        if not size:
+            raise _win32_error('physical_file_resolve')
+        if size >= len(buffer):
+            raise _win32_error('physical_file_resolve', 122)  # ERROR_INSUFFICIENT_BUFFER
         value = buffer.value
     if value.startswith('\\\\?\\UNC\\'):
         return '\\\\' + value[8:]
@@ -36,9 +62,10 @@ def physical_file_path(path):
 
 def physical_directory_path(path):
     """Resolve an existing directory, including a packaged app's virtual overlay."""
-    path = Path(path).expanduser().resolve(strict=True)
-    if not path.is_dir():
-        raise OSError('state path is not a directory')
+    with _os_error_stage('physical_directory_resolve'):
+        path = Path(path).expanduser().resolve(strict=True)
+        if not path.is_dir():
+            raise NotADirectoryError(errno.ENOTDIR, 'state path is not a directory')
     if os.name != 'nt':
         return str(path)
     import ctypes
@@ -56,12 +83,14 @@ def physical_directory_path(path):
     close.restype = wintypes.BOOL
     handle = create(str(path), 0, 7, None, 3, 0x02000000, None)
     if handle == ctypes.c_void_p(-1).value:
-        raise OSError('cannot open state directory')
+        raise _win32_error('physical_directory_open')
     try:
         buffer = ctypes.create_unicode_buffer(32768)
         size = final(handle, buffer, len(buffer), 0)
-        if not size or size >= len(buffer):
-            raise OSError('cannot resolve physical state directory')
+        if not size:
+            raise _win32_error('physical_directory_resolve')
+        if size >= len(buffer):
+            raise _win32_error('physical_directory_resolve', 122)
         value = buffer.value
     finally:
         close(handle)

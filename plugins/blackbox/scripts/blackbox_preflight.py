@@ -8,15 +8,14 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import platform
 import re
-import shutil
-import subprocess
 import sys
 
 MIN_PYTHON = (3, 11)
 REQUIRED_FILES = (
     '.codex-plugin/plugin.json', '.mcp.json', 'hooks/hooks.json',
     'skills/blackbox-review/SKILL.md', 'skills/setup/SKILL.md',
-    'scripts/blackbox.py', 'scripts/launch.cmd', 'scripts/open_notes.py',
+    'scripts/blackbox.py', 'scripts/launch.cmd', 'scripts/launch-legacy.cmd',
+    'scripts/mcp.cmd', 'scripts/blackbox_runtime.py', 'scripts/blackbox_runtime.ps1', 'scripts/open_notes.py',
     'scripts/install_shortcuts.ps1', 'scripts/blackbox_preflight.py',
     'scripts/blackbox_core.py', 'scripts/blackbox_launcher.py', 'scripts/blackbox_install.py', 'scripts/blackbox_compat.py',
     'scripts/blackbox_mcp.py', 'scripts/blackbox_web.py',
@@ -49,7 +48,7 @@ def check_package(root):
     try:
         mcp = json.loads((root / '.mcp.json').read_text(encoding='utf-8-sig'))
         server = mcp['mcpServers']['blackbox_reader']
-        if (server.get('command') != 'python' or server.get('args') != ['-I', 'scripts/blackbox_mcp.py']
+        if (server.get('command') != 'cmd.exe' or server.get('args') != ['/d', '/c', 'scripts\\mcp.cmd']
                 or server.get('cwd') != '.'):
             raise ValueError()
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
@@ -106,38 +105,6 @@ def check_release_manifest(root, version):
     return 'release_manifest_verified', []
 
 
-def inspect_path_python():
-    """MCP uses PATH, independently of the interpreter selected for Hook runtime."""
-    executable = shutil.which('python')
-    if not executable:
-        raise ValueError('MCP requires python on PATH. Install Python 3.11+ with PATH enabled, then reopen Codex.')
-    probe = ('import sys,json,sqlite3,hashlib; '
-             'assert hasattr(hashlib,"file_digest"); '
-             'print(json.dumps({"executable":sys.executable,"version":list(sys.version_info[:3])}))')
-    try:
-        result = subprocess.run([executable, '-I', '-c', probe], capture_output=True,
-                                text=True, timeout=10)
-        data = json.loads(result.stdout)
-        if result.returncode != 0 or tuple(data['version'][:2]) < MIN_PYTHON:
-            raise ValueError()
-        if not isinstance(data['executable'], str) or not data['executable']:
-            raise ValueError()
-        return data
-    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError):
-        raise ValueError('MCP PATH python cannot run the required Python 3.11+ standard library. '
-                         'Correct PATH (including Windows app aliases), then reopen Codex.') from None
-
-
-def runtime_executable():
-    executable = sys.executable
-    if os.name == 'nt':
-        import ctypes
-        buffer = ctypes.create_unicode_buffer(32768)
-        length = ctypes.windll.kernel32.GetShortPathNameW(executable, buffer, len(buffer))
-        executable = buffer.value if 0 < length < len(buffer) else executable
-    return executable
-
-
 def inspect_state(state_dir, root):
     # Importing the resolver does not create a store, launch a service or scan events.
     from blackbox_launcher import resolve_state_directory
@@ -154,11 +121,11 @@ def inspect_state(state_dir, root):
     while not ancestor.exists():
         ancestor = ancestor.parent
     if not ancestor.is_dir() or not os.access(ancestor, os.W_OK):
-        raise ValueError('StateDir is not writable. Choose a directory writable by your Windows account.')
+        raise ValueError('StateDir is not writable. Preserve the selected directory and diagnose the required access before retrying.')
     database = directory / 'notes.sqlite3'
     if database.exists() or database.is_symlink():
         if database.is_symlink() or not database.is_file():
-            raise ValueError('The existing database is not a regular file; leave it unchanged and choose another StateDir.')
+            raise ValueError('The existing database is not a regular file; preserve it and resolve the database location before retrying.')
         try:
             connection = sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=3)
             try:
@@ -184,7 +151,8 @@ def preflight(plugin_root, state_dir=None, require_shortcuts=False):
               'python': sys.executable, 'python_version': platform.python_version(),
               'minimum_python': '3.11', 'platform': platform.system(),
               'minimum_windows': '10', 'windows_version': platform.version(),
-              'state_directory': None, 'mcp_path_python': None,
+              'state_directory': None, 'runtime_binding': 'not_written',
+              'mcp_launch': 'configured_absolute_python', 'host_mcp': 'not_checked',
               'package_source': package_source,
               'host_plugin_registration': 'not_checked', 'host_capture': 'not_checked',
               'errors': errors, 'warnings': warnings}
@@ -201,30 +169,18 @@ def preflight(plugin_root, state_dir=None, require_shortcuts=False):
             raise ImportError()
     except ImportError:
         errors.append('Selected Python lacks required standard-library modules. Install a complete Python 3.11+ distribution.')
-    executable = runtime_executable()
-    if not executable.isascii() or any(char in executable for char in '%!^&|<>"\r\n'):
-        errors.append('Hook runtime requires an ASCII Python path without cmd metacharacters; choose another -Python path.')
     if require_shortcuts:
         base_python = Path(getattr(sys, '_base_executable', sys.executable))
         if not base_python.with_name('pythonw.exe').is_file():
             errors.append('Shortcuts require pythonw.exe beside Python; install complete Python or omit -InstallShortcuts.')
     try:
-        result['mcp_path_python'] = inspect_path_python()
-        if os.path.normcase(str(Path(result['mcp_path_python']['executable']).resolve())) != os.path.normcase(str(Path(sys.executable).resolve())):
-            warnings.append('MCP PATH python differs from the selected Hook Python. Both passed this shell check; '
-                            'Codex may inherit a different PATH. Verify its reader after registering the plugin.')
-    except ValueError as error:
-        errors.append(str(error))
-    try:
         directory = inspect_state(state_dir, root)
         result['state_directory'] = str(directory)
-        default = Path(os.environ.get('LOCALAPPDATA', '')) / 'Blackbox'
-        if not os.environ.get('LOCALAPPDATA') or directory != default.resolve():
-            warnings.append('Custom state directory: Codex Hooks and MCP must inherit BLACKBOX_STATE_DIR with this same path. '
-                            'This installer does not change persistent environment variables or Codex configuration.')
+        warnings.append('Host setup must persist this physical state directory and selected Python with '
+                        'configure-runtime --bind-host. Temporary PATH changes are not a host runtime configuration.')
     except (OSError, ValueError, ImportError) as error:
         errors.append(str(error) if isinstance(error, ValueError) else
-                      'Cannot resolve StateDir. Set -StateDir to a writable directory and retry.')
+                      'Cannot resolve StateDir. Preserve the selected directory and diagnose access before retrying; do not substitute an empty store.')
     warnings.append('Preflight checks this shell only. Codex plugin registration and real Hook delivery remain unverified.')
     result['ok'] = not errors
     return result

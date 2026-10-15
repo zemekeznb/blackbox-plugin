@@ -2,6 +2,7 @@
 from datetime import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 
@@ -17,6 +18,16 @@ def read_small(path):
 
 
 def runtime_status(directory):
+    try:
+        from blackbox_runtime import read_binding
+        binding = read_binding(require_python=False)
+        if binding is not None:
+            if not os.path.samefile(directory, binding['state_directory']):
+                return {'state': 'invalid', 'source': 'host_binding', 'reason': 'state_mismatch'}
+            return {'state': 'configured' if Path(binding['python']).is_file() else 'target_missing',
+                    'source': 'host_binding'}
+    except (OSError, ValueError):
+        return {'state': 'invalid', 'source': 'host_binding'}
     try:
         raw = read_small(Path(directory) / 'runtime.cmd').decode('ascii')
         match = re.fullmatch(r'@"([^"\r\n%!^&|<>]+)" %\*\r?\n?', raw)

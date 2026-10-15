@@ -14,6 +14,10 @@ def default_state():
     override = os.environ.get('BLACKBOX_STATE_DIR') or os.environ.get(LEGACY_STATE_ENV)
     if override:
         return Path(override).expanduser().resolve()
+    from blackbox_runtime import configured_state
+    configured = configured_state()
+    if configured is not None:
+        return configured
     base = os.environ.get('LOCALAPPDATA')
     if not base:
         raise NotesError('LOCALAPPDATA is unavailable; specify --state-dir')

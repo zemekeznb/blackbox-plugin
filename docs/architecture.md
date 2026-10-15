@@ -1,17 +1,17 @@
 # Blackbox Plugin 系统架构
 
-更新：2026-10-15。本文以 **0.4.0-alpha.6.45** 源码为基线，描述当前实现；支持范围与已知限制见[使用与隐私](../release/ALPHA-GUIDE.md)，自动化复现方法见[开发与验证](DEVELOPMENT.md)。
+更新：2026-10-15。本文描述主分支源码；运行绑定与安全错误诊断为待发布修复，已发布 **0.4.0-alpha.6.45** 附件不含这些改动。支持范围与已知限制见[使用与隐私](../release/ALPHA-GUIDE.md)，自动化复现方法见[开发与验证](DEVELOPMENT.md)。
 
 Blackbox 当前上线面向 **Windows 版 Codex 桌面端**，在用户明确启用的项目中保存获授权的可见事件，再按确定性规则呈现执行异常和保守关联的后续调用。会话准入仅接收经确认的持久桌面来源，拒收终端 CLI；CLI 产品适配与完整验收留待后续。没有中央服务、额外模型调用或自动上传；不控制 Agent loop，不读取隐藏推理，不推断根因、责任或修复成功。
 
 ## 接入与数据流
 
-安装、初始化、项目授权、Hook 信任和真实记录送达是不同阶段。安装不会自动启用项目；官方 Hook 信任由 Codex 的审阅流程完成。首次安装或更新后可能需要用户完整重开 Codex，再以真实命令回执验证采集。
+插件登记、运行绑定、桌面 MCP 加载、原生入口打开、本地 HTTP 页面打开、项目授权、Hook 信任和真实记录送达是不同阶段。安装不会自动启用项目；官方 Hook 信任由 Codex 的审阅流程完成。首次安装或更新后可能需要用户完整重开 Codex，再以真实命令回执验证采集。独立 MCP 进程握手与 HTTP 页面成功均不能代替桌面宿主入口验收。
 
 ```text
 Codex 桌面会话中的安装提示词
              ↓ 固定安装载荷与官方插件登记
-Blackbox 插件 + Python 运行配置
+Blackbox 插件 + 当前 Codex 的 Python / 物理状态目录绑定
              ↓ 用户明确启用目标项目，并完成官方 Hook 审阅
 Codex 可见 Hook → launch.cmd → blackbox.py hook
              ↓ 项目授权 + 宿主会话身份准入
@@ -43,6 +43,7 @@ Hook 配置包含 `SessionStart`、`UserPromptSubmit`、`PostToolUse`、`Stop`�
 | [`scripts/blackbox_sessions.py`](../plugins/blackbox/scripts/blackbox_sessions.py) / [`scripts/blackbox_cleanup.py`](../plugins/blackbox/scripts/blackbox_cleanup.py) | 本地会话归档/恢复、确认后的删除、重投保护、删除边界与空间回收回执 |
 | [`scripts/blackbox_backup.py`](../plugins/blackbox/scripts/blackbox_backup.py) | SQLite 在线备份验证、恢复到新的停用目录 |
 | [`scripts/blackbox_install.py`](../plugins/blackbox/scripts/blackbox_install.py) / [`scripts/blackbox_preflight.py`](../plugins/blackbox/scripts/blackbox_preflight.py) | 官方 CLI 安装、载荷与环境检查；与项目采集授权分开 |
+| [`scripts/blackbox_runtime.py`](../plugins/blackbox/scripts/blackbox_runtime.py) / [`scripts/blackbox_runtime.ps1`](../plugins/blackbox/scripts/blackbox_runtime.ps1) | 当前 Codex 的解释器和物理状态目录绑定、无需 Python PATH 的宿主启动、冲突与失效检查 |
 | [`scripts/blackbox_compat.py`](../plugins/blackbox/scripts/blackbox_compat.py) | 旧环境变量、默认目录与插件身份迁移兼容 |
 | [`scripts/blackbox_hooks.py`](../plugins/blackbox/scripts/blackbox_hooks.py) / [`scripts/blackbox_diagnostics.py`](../plugins/blackbox/scripts/blackbox_diagnostics.py) | 只读 Hook 信任检查、运行配置与采集缺口诊断；不代替真实送达证据 |
 | [`assets/`](../plugins/blackbox/assets/) | 两种阅读入口共用的页面、样式、交互脚本及 MCP 桥接 |
@@ -61,7 +62,7 @@ Hook 配置包含 `SessionStart`、`UserPromptSubmit`、`PostToolUse`、`Stop`�
 
 输入大小、字段、会话及数据库容量均有保护；达到上限会拒收相应新事件并尽力留下不含正文的诊断，不自行淘汰旧记录。具体容量以源码常量及状态接口为准。采集缺口写入后续来源的连续性标记，关联不会跨越已知缺口；数据库锁或诊断持久化失败时仍只能尽力处理，不能承诺持续健康。
 
-状态目录优先级为显式 `--state-dir`、`BLACKBOX_STATE_DIR`、兼容变量 `TAS_NOTES_STATE_DIR`、默认 `%LOCALAPPDATA%\Blackbox`。Windows 打包应用可能重定向路径，运行时以实际文件/目录句柄解析结果为准。数据目录不得位于已启用的项目内。
+状态目录优先级为显式 `--state-dir`、`BLACKBOX_STATE_DIR`、兼容变量 `TAS_NOTES_STATE_DIR`、当前 Codex 的有效运行绑定、默认 `%LOCALAPPDATA%\Blackbox`。Windows 打包应用可能重定向路径，运行时以实际文件/目录句柄解析结果为准。数据目录不得位于已启用的项目内。选中的运行绑定损坏、不可读或失效时明确报错，不静默降级到其他目录或新空库。
 
 ## 身份与迁移兼容
 
@@ -92,6 +93,10 @@ MCP 工具声明为页面专用，记录数据放在 `_meta.blackbox`，不放�
 
 ## 本地运行与恢复
 
+`configure-runtime --bind-host` 将实际 Python 绝对路径及物理状态目录写入当前 `CODEX_HOME/blackbox/runtime.json`；解释器路径满足旧 CMD 安全条件时，也写入兼容 Hook 的 `runtime.cmd`，否则仅使用新绑定。MCP、Hook 与后续命令共用此绑定，避免安装会话与桌面后台的 PATH 或 Windows 目录重定向差异。未传 `--bind-host` 的命令保留旧行为，不创建宿主绑定。MCP 通过 `mcp.cmd` 和 Windows 系统 PowerShell 启动器读取绑定，不依赖 `python` PATH，也不修改系统环境、ACL、沙箱或 Hook 信任。自动 MCP/Hook 启动时若环境中的状态目录覆盖值与绑定不是同一目录，会明确拒绝，不能静默切换采集库。运行绑定不是访问授权；所需文件访问仍受宿主权限约束。
+
+核心命令的错误输出保留安全的失败阶段、异常类型与可取得的 `errno` / `winerror`；宿主启动器使用固定错误码报告绑定或启动失败，两者都不直接打印可能含个人路径、SQL 或记录内容的异常文本。Windows 路径 API 失败保留系统错误码。安装器返回登记和运行绑定状态，保留预检警告，默认将桌面 MCP 与侧边栏标记为未验证，后续由真实宿主结果确认。
+
 HTTP 只监听 `127.0.0.1`，使用随机令牌、Host/Origin 校验、CSP 和文本渲染。启动器按状态目录、构建和服务身份核验实例；启动锁串行化复用与发布，不根据不可信 registry PID 强杀进程。同目录存在不同构建时报告冲突，由受控流程停止旧服务。关闭页面或停止阅读服务不等于关闭 Hook 采集。
 
 `backup` 使用 SQLite 在线快照并校验完整性、引用与计数，不覆盖已有文件；`restore` 仅恢复到新目录，所有项目默认停用，不自动接管当前运行时。恢复会建立并核验 `RestoreContinuityUnknown` 标记，避免跨恢复边界关联。备份不包含独立阅读偏好或全部运行时文件；备份和恢复目标须位于 Git 仓库及已登记项目之外。
@@ -100,4 +105,4 @@ HTTP 只监听 `127.0.0.1`，使用随机令牌、Host/Origin 校验、CSP 和�
 
 - 实际可记录范围取决于宿主投递。静默失败、混合输出、内部重试及所测非 Bash/MCP 失败有漏记边界；打印的完整诊断也可能误报。“暂无异常”不代表没有失败。
 - 安装校验、协议夹具、模拟 Hook 和既往版本的验收，不能代替当前版本在新用户桌面会话中的真实采集回执。更新中的长回合不保证热加载无损。
-- 当前上线范围为 Windows 版 Codex 桌面端，CLI 和其他平台支持需另行验收。最低宿主版本、干净 Windows 环境和 API Key 登录的完整链路尚未完成专项验收；用户操作及限制见[使用与隐私](../release/ALPHA-GUIDE.md)。
+- 当前上线范围为 Windows 版 Codex 桌面端，CLI 和其他平台支持需另行验收。公开 .45 的干净电脑测试确认后台 Python 启动失败，并发现另一会话导入访问受限；后者尚未定位原 `OSError` 的具体操作。候选修复仍须通过仅安装正式插件、无 Python PATH、桌面冷启动、新会话与真实记录的验收。最低宿主版本和 API Key 登录的完整链路也尚未完成专项验收；用户操作及限制见[使用与隐私](../release/ALPHA-GUIDE.md)。

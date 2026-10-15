@@ -40,8 +40,7 @@ try {
     }
     Write-Host "Preflight passed: Blackbox Plugin $($notesResult.version)"
     Write-Host "Package source: $($notesResult.package_source)"
-    Write-Host "Hook Python: $($notesResult.python) ($($notesResult.python_version))"
-    Write-Host "MCP PATH Python: $($notesResult.mcp_path_python.executable)"
+    Write-Host "Selected runtime: $($notesResult.python) ($($notesResult.python_version))"
     Write-Host "State directory: $($notesResult.state_directory)"
     foreach ($notesWarning in $notesResult.warnings) { Write-Warning $notesWarning }
     if ($RuntimeOnly -and $ReplaceSource) { throw '-ReplaceSource requires full installation, not -RuntimeOnly.' }
@@ -60,7 +59,9 @@ try {
         exit 0
     }
     $notesEntry = Join-Path $notesRoot 'scripts/blackbox.py'
-    & $notesPython $notesEntry --state-dir $notesResult.state_directory configure-runtime
+    $notesConfigureArguments = @($notesEntry, '--state-dir', $notesResult.state_directory, 'configure-runtime')
+    if (-not $RuntimeOnly) { $notesConfigureArguments += '--bind-host' }
+    & $notesPython @notesConfigureArguments
     if ($LASTEXITCODE -ne 0) {
         throw 'Runtime configuration failed. Check state-directory write access and Python path. Existing project choices were not changed.'
     }

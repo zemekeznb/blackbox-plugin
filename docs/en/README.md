@@ -22,9 +22,11 @@ Please install and initialize Blackbox by following https://github.com/zemekeznb
 ```
 <!-- blackbox:published:end -->
 
-The linked execution instructions are in Chinese and are intended for Codex to follow. Codex checks prerequisites, downloads and verifies the fixed release package, registers the plugin, initializes its local runtime, and opens Blackbox. You do not need to download or extract the package yourself. Installation and opening the interface are reported separately; follow any specific instructions if a prerequisite is missing or a step is blocked.
+The linked execution instructions are in Chinese and are intended for Codex to follow. Codex checks prerequisites, downloads and verifies the fixed release package, registers the plugin, initializes its local runtime, and tries to open Blackbox. You do not need to download or extract the package yourself. Registration, runtime initialization, the native entry, and opening a local web page must be reported separately.
 
-If the plugin has not loaded yet, refresh or start a new conversation as directed. If a full reload is needed, save your work, fully quit and reopen Codex, then send:
+**Known issue in .45:** The official plugin declares a sidebar entry, but its desktop page service depends on a working `python` command. An installation conversation can temporarily use another Python to open a local web page while the desktop backend still fails to start the service. The runtime-binding fix is not yet released; the links above still download the original .45 package.
+
+If the plugin has not loaded, ask Codex to inspect the official `blackbox@personal` plugin's `blackbox_reader` startup status and error. Refresh or start a new conversation if that is the remaining step. If a full reload is needed, save your work, fully quit and reopen Codex, then send:
 
 ```text
 Continue Blackbox's initial setup and open its interface. Do not enable recording for any project yet.
@@ -47,7 +49,7 @@ The recording scope includes visible prompts, replies, tool calls, and their res
 
 ## Review and export
 
-After installation and initialization, find and click **Blackbox** in the **Codex desktop sidebar** to open your records. Alternatively, send “Open Blackbox.” in a Codex desktop conversation and ask Codex to open it for you.
+After the page service loads successfully, click **Blackbox** in the **Codex desktop sidebar** to open your records. Alternatively, send “Open Blackbox.” in a Codex desktop conversation. Opening the local web page in Codex's browser is a separate result and does not confirm that the native entry works.
 
 Continue working normally in the connected project's Codex desktop conversations. To review records, select a project and conversation in Blackbox, filter by time or error type, and open an error record to inspect its saved command, result, and associated follow-up calls. The page identifies supported error formats; it does not determine root cause, responsibility, or whether a later call fixed the problem.
 
@@ -86,17 +88,18 @@ Release .45 rechecks old conversation identity caches. Events whose identity can
 
 | Symptom | Next step |
 | --- | --- |
-| `python` is missing or too old | Install a complete Python 3.11+ distribution with its PATH option enabled, then reopen Codex. |
+| `python` is missing, opens a Store prompt, or is too old | Ask Codex to distinguish the conversation's interpreter from the desktop backend's environment. A temporary PATH change does not repair .45's native entry. Do not automatically install Python or change the system PATH. |
 | Codex cannot be located, or several installations are found | Open the intended Codex desktop app and ask Codex to check the ambiguity. Do not install a separate CLI or arbitrarily choose an old installation. |
 | GitHub access or package verification fails | Check connectivity and send the exact error back to the installing conversation. Retry using the fixed-version instructions; do not skip verification. |
 | The plugin source conflicts with an existing source | Ask Codex to inspect Blackbox's installation source. Do not remove the whole `personal` source if it contains other plugins. |
-| Installation finishes but Blackbox tools are unavailable | Follow the reload steps above instead of repeatedly reinstalling. |
+| Installation finishes but the sidebar entry or tools are unavailable | Check the actual MCP startup error as described above. A working local web page does not prove native loading; Probe plugins are not required. |
+| `OSError`, access denied, or failure in another conversation | Keep the command, exit code, failure stage and available `errno` / `winerror`; compare the interpreter and state directory. Do not clear data, switch directories or disable the sandbox to conceal the failure. |
 | Recording is enabled but no record arrives | Check official Hook trust, runtime configuration, and the actual command receipt; reload if needed. Successful initialization alone does not verify recording. |
 | The page shows no errors | Check whether the command record arrived and whether its output matches a supported error format. An empty error list does not prove that execution succeeded. |
 
 ## Current limits and verification
 
-- This Alpha targets **Codex desktop on Windows**. Codex CLI, Linux/macOS, and other Agent hosts have not completed product adaptation. The minimum Codex version, a clean Windows computer/account, and API-key login mode have not completed dedicated validation.
+- This Alpha targets **Codex desktop on Windows**. Codex CLI, Linux/macOS, and other Agent hosts have not completed product adaptation. Clean-machine testing has exposed desktop Python startup and conversation access failures; the full installation experience has not passed validation. The minimum Codex version and API-key login mode remain unverified. Fixes require the same candidate package to pass restart, new-conversation and real-record checks without Probe plugins.
 - Blackbox cannot reconstruct events the host never delivered. Mixed output, silent failures, and some non-Bash/MCP failures can be missed. Printed diagnostic text can also produce false positives; inspect the actual execution evidence.
 - Installation checks, offline rule tests, read-only metadata checks, and real desktop Hook delivery are separate evidence. Local user feedback does not replace independent-user, clean-machine, or long-term validation. Automated source checks are available in [GitHub Actions](https://github.com/zemekeznb/blackbox-plugin/actions/workflows/alpha.yml) for the corresponding commit; passing CI does not verify recording in your environment.
 - Updates during a long-running conversation may leave gaps. When a full reload is requested, save your work, quit and reopen Codex, and verify a real record again. Missing events are not fabricated or backfilled.

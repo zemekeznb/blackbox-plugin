@@ -210,7 +210,7 @@ def exercise(harness, receipt):
 
     def first_custom(fixture, result):
         command = harness.install(fixture, state=fixture['custom_state'], python=sys.executable)
-        require('BLACKBOX_STATE_DIR' in command['stdout'], 'Custom state inheritance warning is missing.')
+        require('configure-runtime --bind-host' in command['stdout'], 'Persistent host binding guidance is missing.')
         result['database'] = harness.empty_state(fixture['custom_state'])
         result['boundaries'] = harness.boundaries(fixture)
         require(not fixture['default_state'].exists(), 'Custom install touched default state.')
@@ -222,10 +222,11 @@ def exercise(harness, receipt):
         result['boundaries'] = harness.boundaries(fixture, absent_state=True)
 
     def missing_mcp(fixture, result):
-        command = harness.install(fixture, python=sys.executable, expected=1)
-        require('MCP requires python on PATH' in command['stdout'], 'Missing MCP PATH Python was not identified.')
-        require('Traceback' not in command['stdout'] + command['stderr'], 'Missing MCP Python produced a traceback.')
-        result['boundaries'] = harness.boundaries(fixture, absent_state=True)
+        command = harness.install(fixture, python=sys.executable)
+        require('Traceback' not in command['stdout'] + command['stderr'], 'Selected Python produced a traceback.')
+        result['state'] = harness.empty_state(fixture['default_state'])
+        result['boundaries'] = harness.boundaries(fixture)
+        result['host_mcp'] = 'not_tested_by_runtime_only_installer'
 
     def repeat_empty(fixture, result):
         harness.install(fixture)
@@ -313,7 +314,7 @@ def exercise(harness, receipt):
     scenario('first_install_default', first_default)
     scenario('first_install_custom', first_custom)
     scenario('missing_default_python', missing_default, with_python=False)
-    scenario('missing_mcp_path_python', missing_mcp, with_python=False)
+    scenario('selected_python_without_path_python', missing_mcp, with_python=False)
     scenario('repeat_empty_install', repeat_empty)
     scenario('repeat_populated_install', repeat_populated)
     scenario('default_no_capture', default_no_capture)

@@ -630,6 +630,38 @@ def diagnostic(directory, code, project=None, session=None):
     write_diagnostic_marker(directory, 'last-error.json', value)
 
 
+_ERROR_STAGES = frozenset((
+    'restore', 'resolve_state_directory', 'migrate_state', 'capture_scope',
+    'open_store', 'validate_runtime_binding', 'configure-runtime', 'enable', 'disable', 'hook', 'backup',
+    'stop', 'open', 'serve', 'export', 'status', 'write_result',
+    'physical_file_open', 'physical_file_resolve',
+    'physical_directory_open', 'physical_directory_resolve',
+))
+_RUNTIME_ERROR_CODES = frozenset((
+    'runtime_binding_invalid', 'runtime_binding_unreadable', 'runtime_binding_write_failed',
+    'runtime_binding_busy', 'runtime_binding_conflict', 'runtime_unavailable',
+    'runtime_state_unavailable', 'runtime_state_conflict', 'runtime_not_configured',
+    'runtime_interpreter_mismatch',
+))
+
+
+def _safe_failure_details(error, stage):
+    """Return only known stage names and bounded numeric OS error codes."""
+    specific = getattr(error, '_blackbox_stage', None)
+    if type(specific) is str and specific in _ERROR_STAGES:
+        stage = specific
+    if type(stage) is not str or stage not in _ERROR_STAGES:
+        stage = 'unknown'
+    fields = ['stage=' + stage]
+    public_code = getattr(error, 'public_code', None)
+    if isinstance(error, OSError) or (type(public_code) is str and public_code in _RUNTIME_ERROR_CODES):
+        for name in ('errno', 'winerror'):
+            value = getattr(error, name, None)
+            if type(value) is int and -2147483648 <= value <= 4294967295:
+                fields.append(f'{name}={value}')
+    return '; '.join(fields)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Blackbox Plugin: local execution errors and read-only archives')
     parser.add_argument('--state-dir', type=Path)
@@ -647,7 +679,9 @@ def main(argv=None):
     restore_parser = commands.add_parser('restore')
     restore_parser.add_argument('source', type=Path)
     restore_parser.add_argument('destination', type=Path)
-    commands.add_parser('configure-runtime')
+    configure = commands.add_parser('configure-runtime')
+    configure.add_argument('--bind-host', action='store_true',
+                           help='persist this Python and physical state for Codex MCP and Hooks')
     opener = commands.add_parser('open')
     opener.add_argument('--no-browser', action='store_true')
     server = commands.add_parser('serve')
@@ -659,6 +693,7 @@ def main(argv=None):
     export.add_argument('destination', type=Path)
     args = parser.parse_args(argv)
     directory, store = None, None
+    stage = 'restore' if args.command == 'restore' else 'resolve_state_directory'
     try:
         if args.command == 'restore':
             from blackbox_backup import restore
@@ -667,17 +702,47 @@ def main(argv=None):
         from blackbox_launcher import resolve_state_directory
         directory = resolve_state_directory(args.state_dir)
         if args.command == 'configure-runtime':
+            if args.bind_host:
+                from blackbox_runtime import read_binding, RuntimeBindingError
+                previous = read_binding(require_python=False)
+                if previous is not None:
+                    try:
+                        same_state = os.path.samefile(directory, previous['state_directory'])
+                    except OSError:
+                        same_state = False
+                    if not same_state:
+                        raise RuntimeBindingError('runtime_binding_conflict')
+            stage = 'migrate_state'
             from blackbox_compat import migrate_default
             directory = migrate_default(directory)
         if args.command == 'enable':
+            stage = 'capture_scope'
             print_capture_scope(directory, args.project, accepted=args.accept_capture_scope)
             if not args.accept_capture_scope:
                 return 2
         if args.command == 'hook' and not (directory / 'notes.sqlite3').is_file():
             # Installation alone has no authorization and need not create a database.
             return 0
-        store = Store(directory, read_only=args.command in ('status', 'open', 'serve', 'export', 'backup', 'stop')
-                      and (directory / 'notes.sqlite3').is_file())
+        reading = args.command in ('status', 'open', 'serve', 'export', 'backup', 'stop')
+        bound_store = False
+        if reading:
+            stage = 'validate_runtime_binding'
+            from blackbox_runtime import read_binding
+            # An explicit path or environment override must not turn a missing
+            # bound database into a fresh empty store. Validate any binding first;
+            # a valid, separate explicit store retains the legacy CLI semantics.
+            binding = read_binding(require_python=False)
+            if binding is not None:
+                bound = Path(binding['state_directory'])
+                bound_store = os.path.normcase(str(directory)) == os.path.normcase(str(bound))
+                if not bound_store:
+                    try:
+                        bound_store = os.path.samefile(directory, bound)
+                    except FileNotFoundError:
+                        pass
+        stage = 'open_store'
+        store = Store(directory, read_only=reading and (bound_store or (directory / 'notes.sqlite3').is_file()))
+        stage = args.command
         if args.command == 'configure-runtime':
             # The .cmd bootstrap does not require changing PowerShell execution policy.
             # Restrict cmd metacharacters and use an ASCII short path for Windows codepages.
@@ -687,11 +752,22 @@ def main(argv=None):
                 buffer = ctypes.create_unicode_buffer(32768)
                 length = ctypes.windll.kernel32.GetShortPathNameW(executable, buffer, len(buffer))
                 executable = buffer.value if 0 < length < len(buffer) else executable
-            if not executable.isascii() or any(c in executable for c in '%!^&|<>"\r\n'):
+            legacy_safe = executable.isascii() and not any(c in executable for c in '%!^&|<>"\r\n')
+            if not legacy_safe and not args.bind_host:
                 raise NotesError('runtime requires an ASCII executable path without cmd metacharacters')
-            target = Path(directory) / 'runtime.cmd'
-            target.write_text('@"' + executable + '" %*\n', encoding='ascii')
-            result = {'runtime_configured': True, 'python': sys.executable, 'state_directory': str(directory)}
+            # A binding is explicit setup, never a side effect of status/open.
+            # Resolve again after Store creation to retain the physical database
+            # location under Windows packaged-app filesystem redirection.
+            directory = resolve_state_directory(directory)
+            if args.bind_host:
+                from blackbox_runtime import write_binding
+                write_binding(directory, sys.executable)
+            if legacy_safe:
+                target = Path(directory) / 'runtime.cmd'
+                target.write_text('@"' + executable + '" %*\n', encoding='ascii')
+            result = {'runtime_configured': True, 'host_bound': args.bind_host,
+                      'legacy_runtime_configured': legacy_safe,
+                      'python': sys.executable, 'state_directory': str(directory)}
         elif args.command in ('enable', 'disable'):
             result = store.set_project(args.project, args.command == 'enable')
         elif args.command == 'hook':
@@ -726,15 +802,20 @@ def main(argv=None):
             result = {'exported': str(args.destination)}
         else:
             result = store.status()
+        stage = 'write_result'
         print(json.dumps(result, ensure_ascii=True, indent=2))
         return 0
     except (NotesError, OSError, sqlite3.Error, ValueError, RecursionError) as error:
         # Do not print exception text: it can contain input, SQL or filesystem secrets.
         code = error.code if isinstance(error, CaptureLimit) else type(error).__name__
+        public_code = getattr(error, 'public_code', None)
+        if type(public_code) is str and public_code in _RUNTIME_ERROR_CODES:
+            code = public_code
         if getattr(error, 'public_code', None) == 'reviewer_build_changed':
             print('Blackbox Plugin: reviewer_build_changed; run stop, then open. Preserve any old unsaved edits first.', file=sys.stderr)
         else:
-            print(f'Blackbox Plugin: {code}; operation not completed.', file=sys.stderr)
+            details = _safe_failure_details(error, stage)
+            print(f'Blackbox Plugin: {code}; {details}; operation not completed.', file=sys.stderr)
         if args.command == 'hook' and directory is not None and not getattr(error, '_capture_diagnostic_recorded', False):
             if store is not None:
                 store.capture_failure(error)
