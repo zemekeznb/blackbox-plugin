@@ -25,7 +25,7 @@ Codex 内 MCP 页面 / 回环 HTTP 阅读器 → Markdown 快照
 
 Hook 配置包含 `SessionStart`、`UserPromptSubmit`、`PostToolUse`、`Stop`、`PreCompact`、`PostCompact`、`SessionEnd`、`Interrupt`。这表示配置的接收入口，不证明宿主在所有情况下都投递这些事件。宿主未送达的信息无法补回。
 
-当前身份为插件 `blackbox@personal`、技能 `blackbox-setup` / `blackbox-review`、入口 `plugins/blackbox/scripts/blackbox.py`。旧名称只用于兼容输入和历史来源，具体行为见下文[身份与迁移兼容](#身份与迁移兼容)。安装操作见[安装指南](../release/INSTALL.md)，发行与测试见[开发说明](DEVELOPMENT.md)。
+当前身份为插件 `blackbox@personal`、技能 `blackbox-setup` / `blackbox-review`、入口 `plugins/blackbox/scripts/blackbox.py`。旧名称只用于兼容输入和历史来源，具体行为见下文[身份与迁移兼容](#身份与迁移兼容)。安装操作见[安装指南](INSTALL.md)，发行与测试见[开发说明](DEVELOPMENT.md)。
 
 ## 模块索引
 

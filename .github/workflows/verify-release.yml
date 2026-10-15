@@ -9,6 +9,11 @@ on:
         description: Published tag to verify anonymously (for example v0.4.0-alpha.6.45)
         required: true
         type: string
+      promote:
+        description: Also update the public install entry after verification (never publishes a release)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -50,3 +55,90 @@ jobs:
           path: ${{ runner.temp }}/blackbox-download-verification.json
           if-no-files-found: ignore
           retention-days: 14
+
+  promote-install-entry:
+    name: Update the verified public install entry
+    needs: downloads
+    if: >-
+      github.repository == 'zemekeznb/blackbox-plugin' &&
+      (github.event_name == 'release' ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.promote))
+    runs-on: windows-latest
+    timeout-minutes: 10
+    # Only the public-documents job may write; anonymous verification above is read-only.
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      group: blackbox-published-install
+      cancel-in-progress: false
+    steps:
+      - name: Preserve published document bytes
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reverify public downloads and prepare the documentation update
+        shell: pwsh
+        env:
+          BLACKBOX_RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          BLACKBOX_EXPECTED_COMMIT: ${{ github.event_name == 'release' && github.sha || '' }}
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUTF8: '1'
+        run: |
+          $taskPromoteArgs = @('tools/published_install.py', 'promote', '--tag', $env:BLACKBOX_RELEASE_TAG)
+          if ($env:BLACKBOX_EXPECTED_COMMIT) { $taskPromoteArgs += @('--expected-commit', $env:BLACKBOX_EXPECTED_COMMIT) }
+          python @taskPromoteArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/published_install.py check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools/tests -p 'test_published_install.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Commit only the public installation documents and push without forcing
+        id: promote
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BLACKBOX_RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          $taskAllowed = @('release/published.json', 'README.md', 'README.en.md', 'docs/INSTALL.md', 'docs/en/README.md')
+          $taskChanged = @(git diff --name-only HEAD)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $taskUntracked = @(git ls-files --others --exclude-standard)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($taskUntracked.Count -ne 0 -or @($taskChanged | Where-Object { $_ -notin $taskAllowed }).Count -ne 0) {
+            throw 'Refusing changes outside the public installation documents.'
+          }
+          if ($taskChanged.Count -eq 0) {
+            'changed=false' >> $env:GITHUB_OUTPUT
+            'Public installation entry already matches the verified release; no commit or update was made.' >> $env:GITHUB_STEP_SUMMARY
+            exit 0
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- @taskAllowed
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git commit -m "docs: recommend verified $env:BLACKBOX_RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # A competing main update must fail; never rebase, merge or force a stale promotion.
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:refs/heads/main
+          if ($LASTEXITCODE -ne 0) { throw 'main changed or rejected the update; the remote installation entry was not overwritten. Inspect and rerun.' }
+          'changed=true' >> $env:GITHUB_OUTPUT
+          'Public installation entry updated after anonymous verification. Installed plugins and release assets were not changed.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Explicitly start main CI after the bot commit
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Pushes made with GITHUB_TOKEN do not trigger a push workflow.
+          # Also dispatch on an idempotent retry after an earlier dispatch failure.
+          gh workflow run alpha.yml --repo zemekeznb/blackbox-plugin --ref main
+          if ($LASTEXITCODE -ne 0) { throw 'The installation entry was updated, but starting CI failed. Run Alpha candidate checks on main manually.' }

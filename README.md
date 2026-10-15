@@ -6,17 +6,19 @@
 
 <p align="center">Agent 的本地执行异常记录本</p>
 
+<!-- blackbox:published:start -->
 <p align="center">
-  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.45"><img src="https://img.shields.io/badge/alpha-0.4.0--alpha.6.45-b6532f?style=flat-square" alt="Alpha 0.4.0-alpha.6.45"></a>
+  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.45"><img src="https://img.shields.io/badge/version-0.4.0--alpha.6.45-b6532f?style=flat-square" alt="Version 0.4.0-alpha.6.45"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
-  <a href="release/INSTALL.md"><img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows"></a>
-  <a href="release/INSTALL.md"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
+  <a href="docs/INSTALL.md"><img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows"></a>
+  <a href="docs/INSTALL.md"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
 </p>
+<!-- blackbox:published:end -->
 
 <p align="center">
   <strong>简体中文</strong> ·
   <a href="README.en.md">English</a> ·
-  <a href="release/INSTALL.md">安装指南</a> ·
+  <a href="docs/INSTALL.md">安装指南</a> ·
   <a href="docs/DEVELOPMENT.md">开发与发布</a> ·
   <a href="https://github.com/zemekeznb/blackbox-plugin/releases">版本记录</a>
 </p>
@@ -29,15 +31,21 @@
 
 ## 快速安装
 
+<!-- blackbox:published:start -->
 当前版本 **0.4.0-alpha.6.45**。准备好 **Windows、Codex 桌面版、可在 Codex 中通过 `python` 调用的 Python 3.11+**，以及能够访问 GitHub 的网络。无需 Git、GitHub 登录或单独安装 Codex CLI。
+<!-- blackbox:published:end -->
+
+此入口始终对应已公开发布并通过下载验证的版本。
 
 **交给 Codex 安装：** 打开 Codex 桌面版，在会话中复制发送：
 
+<!-- blackbox:published:start -->
 ```text
 请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 ```
+<!-- blackbox:published:end -->
 
-Codex 会检查依赖、下载并校验插件、完成安装与初始化，然后打开 Blackbox。**安装不会自动启用项目采集。** 若提示插件尚未加载，按提示新开会话；确需重载时，保存工作并完整退出重开 Codex。详细步骤与排查见[安装指南](release/INSTALL.md)。
+Codex 会检查依赖、下载并校验插件、完成安装与初始化，然后打开 Blackbox。**安装不会自动启用项目采集。** 若提示插件尚未加载，按提示新开会话；确需重载时，保存工作并完整退出重开 Codex。详细步骤与排查见[安装指南](docs/INSTALL.md)。
 
 ## 它能帮你做什么
 
@@ -82,10 +90,10 @@ Codex 会检查依赖、下载并校验插件、完成安装与初始化，然�
 
 | 文档 | 内容 |
 | --- | --- |
-| [安装指南](release/INSTALL.md) | 对话安装、项目接入、排查、更新与卸载 |
+| [安装指南](docs/INSTALL.md) | 对话安装、项目接入、排查、更新与卸载 |
 | [使用与隐私](release/ALPHA-GUIDE.md) | 保存范围、备份恢复、导出和已知限制 |
 | [English guide](docs/en/README.md) | Installation, project setup, usage, privacy and troubleshooting |
-| [开发与发布](docs/DEVELOPMENT.md) | 本地测试、候选构建、CI 与版本交付 |
+| [开发与发布](docs/DEVELOPMENT.md) | 本地测试、CI、发布草稿与确认发布后的安装入口更新 |
 | [架构与边界](docs/architecture.md) | 会话准入、事件存储、异常识别与数据管理 |
 | [版本记录](https://github.com/zemekeznb/blackbox-plugin/releases) · [问题反馈](https://github.com/zemekeznb/blackbox-plugin/issues) | 已发布安装包、更新与问题跟踪 |
 

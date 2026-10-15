@@ -9,10 +9,11 @@ python -m unittest discover -s tests -p 'test_*.py'
 $bbTests = Get-ChildItem tests -Filter 'test_*.cjs' | ForEach-Object FullName
 node --test @bbTests
 python tools/build_alpha.py
-python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.45-candidate.zip
+$bbVersion = (Get-Content plugins/blackbox/.codex-plugin/plugin.json -Raw | ConvertFrom-Json).version
+python tools/verify_alpha_candidate.py "dist/blackbox-plugin-$bbVersion-candidate.zip"
 ```
 
-候选构建使用文件白名单、逐文件 SHA256 和有限敏感模式检查；不包含本地数据库和 `.local`。包内安装说明为 `release/INSTALL.md`。校验工具核对摘要并运行隔离阅读器检查，不安装插件、不启用真实项目。
+候选构建使用文件白名单、逐文件 SHA256 和有限敏感模式检查；不包含本地数据库和 `.local`。包内安装说明为 `release/INSTALL.md`，随源码候选版本更新；面向用户的[安装指南](INSTALL.md)保持在已发布版本。校验工具核对摘要并运行隔离阅读器检查，不安装插件、不启用真实项目。
 
 交付流程自身的测试单独运行；它们只在源码中验证发布逻辑，不随用户候选包分发：
 
@@ -30,16 +31,16 @@ python -m unittest discover -s tools/tests -p 'test_*.py'
 | --- | --- | --- |
 | 修改代码 | 明确改动范围，完成代码和相关测试 | 本地命令执行对应测试 |
 | 提交到 main | 审阅改动；授权 Codex 提交推送，或自行推送 | main CI 检查源码、界面和候选包 |
-| 决定准备版本 | 确定版本号、变更说明与发布窗口，同步版本文件；推送后确认 CI 通过 | 版本及安装入口一致性检查 |
+| 决定准备版本 | 确定版本号、变更说明，同步候选版本文件；推送后确认 CI 通过 | 分别检查候选版本和公开安装入口的一致性 |
 | 准备发布草稿 | 在 Actions → **Prepare release draft** → **Run workflow** 选择 main，输入新版本标签 | 重新完整测试，通过后创建新标签、构建并上传 ZIP、SHA256 文件和清单到草稿 |
 | 验收并公开发布 | 用草稿中的同一份安装包完成真实 Windows/Codex 桌面验收；检查发布说明后点击 **Publish release** | 发布事件启动下载验证 |
-| 发布后检查 | 查看验证结果，并检查 README 安装提示词的实际体验 | 匿名验证安装说明、引导脚本和三个附件的版本、来源与摘要 |
+| 发布后检查 | 查看验证结果，并检查 README 安装提示词的实际体验 | 匿名验证版本、来源与摘要；通过后更新公开版本记录和四份用户文档，再启动 main CI |
 
 **不要提前手动创建版本标签。** 草稿流程负责创建标签；已有标签、草稿或 Release 会使它停止。普通代码提交不必升级插件版本，也不必运行草稿流程。
 
 也可以直接在协作会话中提出“准备下一个版本，先生成草稿，暂不发布”，交由 Codex 完成版本整理、测试和启动流程；确认真实桌面验收后，再明确要求“发布这个草稿”。这两个指令对应不同授权阶段，前一个不包含最终公开发布。
 
-当前 README 与安装指南的版本链接随源码版本同步，因此下一次版本整理和公开发布须安排在同一发布窗口；草稿附件尚不能匿名下载。不要提前将首页长期切到未发布版本，具体限制和操作见下文。
+源码候选版本与公开安装版本分开维护。准备草稿期间，README 和用户安装指南继续指向当前可下载版本；只有维护者确认公开发布、下载验证通过后，自动流程才切换入口。已安装插件由用户主动更新。
 
 ### 工作流与边界
 
@@ -47,11 +48,13 @@ python -m unittest discover -s tools/tests -p 'test_*.py'
 | --- | --- | --- |
 | [`alpha.yml`](../.github/workflows/alpha.yml) | main 推送、PR、手动运行，或由准备草稿流程调用 | Windows/Python 3.11、3.13 的源码与解包测试、界面测试、候选包完整性及隔离阅读器检查 |
 | [`prepare-release.yml`](../.github/workflows/prepare-release.yml) | 维护者手动输入版本标签 | 检查版本与提交来源，复用完整 CI，将通过检查的 ZIP、SHA256 文件和清单上传到 Release 草稿 |
-| [`verify-release.yml`](../.github/workflows/verify-release.yml) | Release 发布，或维护者手动输入已发布标签 | 匿名获取固定标签的安装说明、引导脚本和三个附件，核对版本、链接与文件摘要 |
+| [`verify-release.yml`](../.github/workflows/verify-release.yml) | Release 发布，或维护者手动输入已发布标签 | 匿名核对安装说明、引导脚本和三个附件；发布事件验证通过后更新公开安装入口，手动运行默认只验证 |
 
-运行结果以对应提交和标签的 [GitHub Actions 记录](https://github.com/zemekeznb/blackbox-plugin/actions)为准。只有创建草稿的作业申请 `contents: write`；测试和公开下载验证不需要发布权限。草稿创建不等于发布授权或真实桌面验收通过。
+运行结果以对应提交和标签的 [GitHub Actions 记录](https://github.com/zemekeznb/blackbox-plugin/actions)为准。创建草稿的作业需要 `contents: write`；公开入口更新由下载验证之后的独立作业执行，申请写入文档和启动 CI 所需的权限。测试和匿名下载验证作业保持只读。草稿创建不等于发布授权或真实桌面验收通过。
 
-版本来源为 `plugins/blackbox/.codex-plugin/plugin.json`。构建会检查引导工具的 VERSION 和 Codex 安装说明中的固定标签是否一致；不一致时停止构建。修改版本时还需同步首页与安装指南的提示词链接，入口测试检查它们与插件版本、执行说明中的引导工具标签一致。先测试并构建试用候选，再记录验收证据；已提交且工作树干净后可重建具有明确提交来源的候选包。
+候选版本来源为 `plugins/blackbox/.codex-plugin/plugin.json`。修改版本时同步 `tools/bootstrap_blackbox.py` 的 VERSION、`release/INSTALL.md` 的提示词和 `release/INSTALL-CODEX.md` 的固定标签，构建与入口测试检查它们是否一致。先测试并构建试用候选，再记录验收证据；已提交且工作树干净后可重建具有明确提交来源的候选包。
+
+公开安装版本记录在 [`release/published.json`](../release/published.json)。README 中的版本、徽章、固定标签安装提示词，以及 [`docs/INSTALL.md`](INSTALL.md)、[英文指南](en/README.md)中的对应内容由工具统一更新，和源码候选版本分别校验。准备新候选时，不手动升级这份记录或四份用户文档的公开版本块。块边界为 `<!-- blackbox:published:start -->` 和 `<!-- blackbox:published:end -->`；编辑说明文字时保留标记，历史版本说明不要放入这些块中。
 
 项目采用 [MIT 许可证](../LICENSE)，构建器会将 LICENSE 纳入新候选包；第三方字体保留其[原有许可声明](../plugins/blackbox/assets/review.css)。`--for-release` 要求已有 LICENSE 和干净提交，但仍不会发布或证明真实宿主采集通过。准备草稿流程复用完整 CI 验证过的候选字节，不在上传时重新打包；不提供自动市场发布或 npm 发布。
 
@@ -61,15 +64,17 @@ python -m unittest discover -s tools/tests -p 'test_*.py'
 
 ### 准备与发布一个新版本
 
-1. 同步插件版本、引导工具和安装提示词中的固定标签，提交并推送，确认 main 的 CI 通过。新版本使用新的标签，不能重复发布当前 `.45` 或替换旧附件。
+1. 同步插件版本、引导工具、包内 `release/INSTALL.md` 和 `release/INSTALL-CODEX.md` 中的固定标签，提交并推送，确认 main 的 CI 通过。保留 `release/published.json` 和用户文档的公开版本不变。新版本使用新的标签，不能重复发布当前 `.45` 或替换旧附件。
 2. 在 Actions 中选择 main，手动运行 `prepare-release.yml`，输入 `v` 前缀的版本标签。标签须与该次运行提交中的插件版本一致。流程重新执行完整检查，两种 Python 环境均通过后，使用 Python 3.13 检查过的候选字节创建新标签及草稿，上传三个附件。已存在的标签、Release 或草稿会让流程停止，不覆盖已有内容。
 3. 使用草稿中的同一份 ZIP 在 Windows 版 Codex 桌面端验收安装、页面打开和真实项目记录送达；安装与初始化还应检查移除 Codex/Git PATH 后的隔离场景。不要把测试夹具或隔离阅读器成功当作真实 Hook 投递证据。
-4. 确认版本说明、附件和桌面验收结果后，由维护者在 GitHub Release 页面点击发布。Alpha 版本保留预发布标记。流程不会替维护者发布，也不修改首页推荐版本。
-5. 检查 `verify-release.yml` 的结果：固定标签的安装说明与引导脚本、ZIP、SHA256 文件和清单必须可匿名获取，且版本和摘要一致。发布后再从面向用户的安装提示词检查完整接入体验。
+4. 确认版本说明、附件和桌面验收结果后，由维护者在 GitHub Release 页面点击发布。Alpha 版本保留预发布标记。流程不会替维护者公开发布。
+5. `verify-release.yml` 匿名检查固定标签的安装说明、引导脚本、ZIP、SHA256 文件和清单，核对版本、来源与摘要。只有通过后，独立作业才更新 `release/published.json`、`README.md`、`README.en.md`、`docs/INSTALL.md` 和 `docs/en/README.md`，提交并普通推送到 main，再显式启动 main CI。检查这两次工作流结果，并从更新后的安装提示词检查完整接入体验。
 
-目前入口测试要求 README、安装指南与源码版本同步。下一次修改版本时，应将公开安装链接的切换安排在发布窗口内：仅有草稿时，新版本附件还不能匿名下载。准备草稿工作流本身不会改写 README，也没有独立的“稳定版本入口”切换机制；不要让首页长期指向尚未发布的版本。
+更新只涉及上述五个文件，不移动标签、不覆盖发行附件，也不改用户已安装的插件、项目开关或本地记录。旧版本不能覆盖较新的公开入口；相同版本重复运行保持幂等。验证失败或推送遇到并发提交时，旧入口保留，工作流报告失败；不会强制推送或自动回退版本。
 
-下载验证订阅 GitHub 的 `release.published`，覆盖正式版以及从草稿发布的预发布版本。若需要重查，可手动运行并填写同一已发布标签；如果以后改为其他自动化通过 `GITHUB_TOKEN` 发布，也应显式触发验证，因为这种令牌产生的事件通常不会触发后续工作流。参见 GitHub 的[发布事件说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release)和[工作流触发规则](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow)。
+下载验证订阅 GitHub 的 `release.published`，覆盖正式版以及从草稿发布的预发布版本。手动运行填写已发布标签，默认只读，不更新入口；需要恢复一次未完成的入口更新时，明确勾选 `promote`，重新通过验证后再尝试更新。若先前文档已经推送、只有后续 CI 启动失败，同版本恢复不会重复修改文档，仍会启动 CI。
+
+入口自动提交使用 `GITHUB_TOKEN`，其推送通常不会再次触发工作流，因此流程显式启动 `alpha.yml`。如果以后通过其他自动化使用 `GITHUB_TOKEN` 发布 Release，也需显式触发下载验证；不能假定发布事件会继续串联。参见 GitHub 的[发布事件说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release)和[工作流触发规则](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow)。
 
 下载验证只读取公开文件，不执行下载的安装器、不安装或更新插件、不启用项目，不上传记录。验证失败时先保留具体失败信息，检查链接、附件与摘要；不要通过移动旧标签或覆盖旧附件掩盖问题。对已发布版本的修复仍应按授权范围交付新版本。引导工具只接受对应版本载荷，后续版本发布仍需维护者授权。
 

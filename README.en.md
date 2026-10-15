@@ -6,12 +6,14 @@
 
 <p align="center">A local execution error notebook for agents</p>
 
+<!-- blackbox:published:start -->
 <p align="center">
-  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.45"><img src="https://img.shields.io/badge/alpha-0.4.0--alpha.6.45-b6532f?style=flat-square" alt="Alpha 0.4.0-alpha.6.45"></a>
+  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.45"><img src="https://img.shields.io/badge/version-0.4.0--alpha.6.45-b6532f?style=flat-square" alt="Version 0.4.0-alpha.6.45"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
   <a href="docs/en/README.md"><img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows"></a>
   <a href="docs/en/README.md"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
 </p>
+<!-- blackbox:published:end -->
 
 <p align="center">
   <a href="README.md">简体中文</a> ·
@@ -29,13 +31,19 @@ Review execution errors, saved command results and follow-up calls by project an
 
 ## Quick start
 
+<!-- blackbox:published:start -->
 The current version is **0.4.0-alpha.6.45**. You need **Windows, the Codex desktop app, Python 3.11+ available to Codex as `python`**, and access to GitHub. Git, a GitHub login and a separate Codex CLI installation are not required.
+<!-- blackbox:published:end -->
+
+This entry point stays on the published version that has passed download verification.
 
 **Let Codex install it.** Open a conversation in the Codex desktop app and send:
 
+<!-- blackbox:published:start -->
 ```text
 Please install and initialize Blackbox by following https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md, then open its interface. Do not enable recording for any project yet, and do not change my model, account, or system environment configuration.
 ```
+<!-- blackbox:published:end -->
 
 Codex checks dependencies, downloads and verifies the plugin, installs it, initializes the local runtime and opens Blackbox. **Installation does not enable project recording.** If the plugin has not loaded, follow the instructions to start a new conversation or, when needed, save your work and fully restart Codex. See the [user guide](docs/en/README.md) for troubleshooting. The installation instructions read by Codex and the current interface are in Chinese.
 
@@ -83,9 +91,9 @@ Read the recording scope in the prompt, then copy and send it to a **Codex deskt
 | Document | Contents |
 | --- | --- |
 | [English guide](docs/en/README.md) | Installation, project setup, usage, privacy, troubleshooting and uninstalling |
-| [安装指南 / Installation](release/INSTALL.md) (中文) | Conversational installation, project setup, updates and troubleshooting |
+| [安装指南 / Installation](docs/INSTALL.md) (中文) | Conversational installation, project setup, updates and troubleshooting |
 | [使用与隐私 / Usage and privacy](release/ALPHA-GUIDE.md) (中文) | Recording scope, backups, exports and limitations |
-| [Development and releases](docs/DEVELOPMENT.md) (中文) | Local tests, candidate builds, CI and version delivery |
+| [Development and releases](docs/DEVELOPMENT.md) (中文) | Local tests, CI, release drafts and installation entry updates after approved publication |
 | [Architecture and boundaries](docs/architecture.md) (中文) | Session admission, storage, error recognition and data management |
 | [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) · [Issues](https://github.com/zemekeznb/blackbox-plugin/issues) | Published packages, updates and issue tracking |
 

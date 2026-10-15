@@ -1,6 +1,6 @@
 # Blackbox Plugin — Alpha 使用说明
 
-Blackbox 面向 Windows 版 Codex 桌面端，为明确启用的项目保存宿主送达的本地事件，按项目和会话回看可识别的执行错误，并导出 Markdown 记录。安装与首次接入请从[安装指南](INSTALL.md)开始；本页说明日常使用、保存范围和当前限制。
+Blackbox 面向 Windows 版 Codex 桌面端，为明确启用的项目保存宿主送达的本地事件，按项目和会话回看可识别的执行错误，并导出 Markdown 记录。安装与首次接入请从[公开安装指南](https://github.com/zemekeznb/blackbox-plugin/blob/main/docs/INSTALL.md)开始；本页说明日常使用、保存范围和当前限制。
 
 ## 使用前了解
 
@@ -40,7 +40,7 @@ Codex 内 Blackbox 页面的“保存到下载文件夹”会将已预览并校�
 
 可以在 Codex 中请求 `blackbox-review` 将数据备份到项目和 Git 仓库之外的新文件。备份仍可能包含敏感信息，不自动加密或上传；数据库快照不包括运行命令、服务令牌和阅读偏好。
 
-恢复只写入新目录，所有项目默认停用，不覆盖当前数据库或自动恢复采集。需要重置体验时，先明确清理范围、停用项目、停止服务并验证备份。更新和卸载操作见[安装指南](INSTALL.md)。
+恢复只写入新目录，所有项目默认停用，不覆盖当前数据库或自动恢复采集。需要重置体验时，先明确清理范围、停用项目、停止服务并验证备份。更新和卸载操作见[公开安装指南](https://github.com/zemekeznb/blackbox-plugin/blob/main/docs/INSTALL.md)。
 
 ## 当前限制与反馈
 

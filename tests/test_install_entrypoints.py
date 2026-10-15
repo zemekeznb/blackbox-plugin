@@ -40,11 +40,13 @@ class InstallEntrypointTests(unittest.TestCase):
             + self.version + '/tools/bootstrap_blackbox.py'
         }, set(links))
 
-    def test_readme_and_guide_offer_the_same_prompt_when_readme_is_present(self):
-        # The release's regression bundle deliberately excludes the repository README.
-        readme = ROOT / 'README.md'
-        if readme.exists():
-            self.assertEqual(self.prompt, install_prompt_from(readme))
+    def test_packaged_guide_retains_the_source_version(self):
+        # This guide is bundled with the candidate, so it must follow the source
+        # version even while the public README still recommends an older release.
+        # Public documentation is checked separately by published_install.py in CI.
+        guide = (ROOT / 'release/INSTALL.md').read_text(encoding='utf-8')
+        self.assertIn('**' + self.version + '**', guide)
+        self.assertIn('/blob/v' + self.version + '/release/INSTALL-CODEX.md', self.prompt)
 
 
 if __name__ == '__main__':

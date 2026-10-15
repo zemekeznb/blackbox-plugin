@@ -1,10 +1,14 @@
 # Blackbox user guide
 
-[English overview](../../README.en.md) · [中文首页](../../README.md) · [中文安装指南](../../release/INSTALL.md) · [中文使用与隐私](../../release/ALPHA-GUIDE.md)
+[English overview](../../README.en.md) · [中文首页](../../README.md) · [中文安装指南](../INSTALL.md) · [中文使用与隐私](../../release/ALPHA-GUIDE.md)
 
 Blackbox records local execution errors for **Codex desktop on Windows**. It lets you review saved commands, results, and conservatively linked follow-up calls by project and conversation, then export a Markdown snapshot. Recording requires explicit approval for each project.
 
+<!-- blackbox:published:start -->
 The current version is **0.4.0-alpha.6.45**. The interface currently uses Chinese; this guide keeps the original button labels alongside English explanations.
+<!-- blackbox:published:end -->
+
+The installation entry below stays on the published version that has passed download verification; preparing a draft does not switch it.
 
 ## Install through Codex
 
@@ -12,9 +16,11 @@ You need Windows, an installed and running Codex desktop app, Python **3.11 or l
 
 Send this message in a **Codex desktop conversation**:
 
+<!-- blackbox:published:start -->
 ```text
 Please install and initialize Blackbox by following https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md, then open its interface. Do not enable recording for any project yet, and do not change my model, account, or system environment configuration.
 ```
+<!-- blackbox:published:end -->
 
 The linked execution instructions are in Chinese and are intended for Codex to follow. Codex checks prerequisites, downloads and verifies the fixed release package, registers the plugin, initializes its local runtime, and opens Blackbox. You do not need to download or extract the package yourself. Installation and opening the interface are reported separately; follow any specific instructions if a prerequisite is missing or a step is blocked.
 
@@ -97,14 +103,16 @@ Release .45 rechecks old conversation identity caches. Events whose identity can
 
 ## Documentation and feedback
 
+<!-- blackbox:published:start -->
 | Link | Contents |
 | --- | --- |
-| [Chinese installation guide](../../release/INSTALL.md) | Installation, project setup, troubleshooting, updates, and removal |
+| [Chinese installation guide](../INSTALL.md) | Installation, project setup, troubleshooting, updates, and removal |
 | [Chinese usage and privacy guide](../../release/ALPHA-GUIDE.md) | Local records, exports, backup, restore, and limitations |
-| [Instructions for Codex](../../release/INSTALL-CODEX.md) (Chinese) | The installation procedure followed by the assistant |
-| [Development and validation](../DEVELOPMENT.md) (Chinese) | Tests, packaging, CI, and release procedures |
+| [Instructions for Codex](https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md) (Chinese) | The installation procedure followed by the assistant |
+| [Development and validation](../DEVELOPMENT.md) (Chinese) | Tests, CI, release drafts, and installation entry updates after approved publication |
 | [Architecture](../architecture.md) (Chinese) | Data flow, storage, permissions, and component boundaries |
 | [GitHub Issues](https://github.com/zemekeznb/blackbox-plugin/issues) | Bug reports and feedback |
+<!-- blackbox:published:end -->
 
 When reporting a problem, include the version, steps, and a redacted error message. Distinguish installation failure, a page that will not open, and an enabled project with no received record. Do not upload the full database, private conversation text, keys, or account credentials.
 
