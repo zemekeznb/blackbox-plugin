@@ -1,7 +1,7 @@
 # 安装与项目接入
 
 <!-- blackbox:published:start -->
-当前版本 **0.4.0-alpha.6.45**，本轮仅面向 **Windows 版 Codex 桌面端**。先安装并打开 Codex，确保宿主能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集，CLI 使用支持留待后续补充。
+当前版本 **0.4.0-alpha.6.46**，本轮仅面向 **Windows 版 Codex 桌面端**。先安装并打开 Codex，确保宿主能通过 `python` 调用 Python 3.11+，并能访问 GitHub。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集，CLI 使用支持留待后续补充。
 <!-- blackbox:published:end -->
 
 此指南的安装入口保持在已公开发布并通过下载验证的版本；准备中的版本不会提前切换这里的链接。
@@ -12,7 +12,7 @@
 
 <!-- blackbox:published:start -->
 ```text
-请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 ```
 <!-- blackbox:published:end -->
 
@@ -70,5 +70,5 @@ Codex 会读取固定版本的执行说明、检查依赖、下载并校验插�
 .45 收紧会话准入，防止安装辅助终端产生额外记录；升级后旧身份缓存会重新核对，已有历史不自动删除。公开下载与隔离安装检查已具备，但干净电脑测试已暴露后台 Python 启动和会话访问问题，完整安装体验尚未通过验收。最低 Codex 版本及 API Key 登录模式也尚未完成专项验收。修复需用新候选包验证重启、新会话及真实记录，不能用开发机或 Probe 结果替代。支持范围和已知限制见[使用与隐私](../release/ALPHA-GUIDE.md#当前限制与反馈)。
 
 <!-- blackbox:published:start -->
-[Codex 执行说明](https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md)供安装会话读取；[开发与验证](DEVELOPMENT.md)供维护者使用。
+[Codex 执行说明](https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md)供安装会话读取；[开发与验证](DEVELOPMENT.md)供维护者使用。
 <!-- blackbox:published:end -->

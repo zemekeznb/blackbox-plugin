@@ -8,7 +8,7 @@
 
 <!-- blackbox:published:start -->
 <p align="center">
-  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.45"><img src="https://img.shields.io/badge/version-0.4.0--alpha.6.45-b6532f?style=flat-square" alt="Version 0.4.0-alpha.6.45"></a>
+  <a href="https://github.com/zemekeznb/blackbox-plugin/releases/tag/v0.4.0-alpha.6.46"><img src="https://img.shields.io/badge/version-0.4.0--alpha.6.46-b6532f?style=flat-square" alt="Version 0.4.0-alpha.6.46"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
   <a href="docs/INSTALL.md"><img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows"></a>
   <a href="docs/INSTALL.md"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
@@ -32,7 +32,7 @@
 ## 快速安装
 
 <!-- blackbox:published:start -->
-当前版本 **0.4.0-alpha.6.45**。准备好 **Windows、Codex 桌面版、可在 Codex 中通过 `python` 调用的 Python 3.11+**，以及能够访问 GitHub 的网络。无需 Git、GitHub 登录或单独安装 Codex CLI。
+当前版本 **0.4.0-alpha.6.46**。准备好 **Windows、Codex 桌面版、可在 Codex 中通过 `python` 调用的 Python 3.11+**，以及能够访问 GitHub 的网络。无需 Git、GitHub 登录或单独安装 Codex CLI。
 <!-- blackbox:published:end -->
 
 此入口始终对应已公开发布并通过下载验证的版本。
@@ -41,7 +41,7 @@
 
 <!-- blackbox:published:start -->
 ```text
-请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.45/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 ```
 <!-- blackbox:published:end -->
 
