@@ -14,21 +14,51 @@ python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.45-can
 
 候选构建使用文件白名单、逐文件 SHA256 和有限敏感模式检查；不包含本地数据库和 `.local`。包内安装说明为 `release/INSTALL.md`。校验工具核对摘要并运行隔离阅读器检查，不安装插件、不启用真实项目。
 
+交付流程自身的测试单独运行；它们只在源码中验证发布逻辑，不随用户候选包分发：
+
+```powershell
+python -m unittest discover -s tools/tests -p 'test_*.py'
+```
+
 ## CI 与交付
 
-[`alpha.yml`](../.github/workflows/alpha.yml) 在 PR 和手动触发时运行 Windows/Python 3.11、3.13 的源码与解包测试；当前不在每次 main 推送时自动触发，也不发布制品。结果以对应提交的 [GitHub Actions 运行记录](https://github.com/zemekeznb/blackbox-plugin/actions/workflows/alpha.yml)为准。
+交付分为自动检查、准备草稿和人工发布后的下载验证。向 main 推送不会创建 Release，也不会更新用户已经安装的插件。
+
+| 工作流 | 触发方式 | 结果 |
+| --- | --- | --- |
+| [`alpha.yml`](../.github/workflows/alpha.yml) | main 推送、PR、手动运行，或由准备草稿流程调用 | Windows/Python 3.11、3.13 的源码与解包测试、界面测试、候选包完整性及隔离阅读器检查 |
+| [`prepare-release.yml`](../.github/workflows/prepare-release.yml) | 维护者手动输入版本标签 | 检查版本与提交来源，复用完整 CI，将通过检查的 ZIP、SHA256 文件和清单上传到 Release 草稿 |
+| [`verify-release.yml`](../.github/workflows/verify-release.yml) | Release 发布，或维护者手动输入已发布标签 | 匿名获取固定标签的安装说明、引导脚本和三个附件，核对版本、链接与文件摘要 |
+
+运行结果以对应提交和标签的 [GitHub Actions 记录](https://github.com/zemekeznb/blackbox-plugin/actions)为准。只有创建草稿的作业申请 `contents: write`；测试和公开下载验证不需要发布权限。草稿创建不等于发布授权或真实桌面验收通过。
 
 版本来源为 `plugins/blackbox/.codex-plugin/plugin.json`。构建会检查引导工具的 VERSION 和 Codex 安装说明中的固定标签是否一致；不一致时停止构建。修改版本时还需同步首页与安装指南的提示词链接，入口测试检查它们与插件版本、执行说明中的引导工具标签一致。先测试并构建试用候选，再记录验收证据；已提交且工作树干净后可重建具有明确提交来源的候选包。
 
-项目采用 [MIT 许可证](../LICENSE)，构建器会将 LICENSE 纳入新候选包；第三方字体保留其[原有许可声明](../plugins/blackbox/assets/review.css)。`--for-release` 要求已有 LICENSE 和干净提交，但仍不会发布或证明真实宿主采集通过。没有自动 GitHub Release、市场发布或 npm 发布流程。
+项目采用 [MIT 许可证](../LICENSE)，构建器会将 LICENSE 纳入新候选包；第三方字体保留其[原有许可声明](../plugins/blackbox/assets/review.css)。`--for-release` 要求已有 LICENSE 和干净提交，但仍不会发布或证明真实宿主采集通过。准备草稿流程复用完整 CI 验证过的候选字节，不在上传时重新打包；不提供自动市场发布或 npm 发布。
 
 本轮面向 Windows 版 Codex 桌面端，只提供 README 中的对话安装提示词。Codex 读取固定标签的 `release/INSTALL-CODEX.md`，审阅并执行同版本 `tools/bootstrap_blackbox.py`，完成宿主定位、载荷下载校验、官方登记与首次设置。不要求客户配置 Codex CLI PATH 或 Git，不自动启用项目或写 Hook 信任。Codex CLI 产品适配与完整验收留待后续，安装器内部调用官方 CLI 不代表已完成终端使用验收。
 
 根目录 `install.ps1` 与 Git 安装验证脚本保留为维护/兼容入口，不放到用户快速安装步骤中。没有发布 npm/PyPI 包，也没有官方公共插件目录条目；不要编造对应安装命令。
 
-维护者先通过测试，在取得发布授权后提交代码并创建固定标签，从干净提交构建候选，将 ZIP/摘要/清单上传到同一版本 Release。引导工具只接受对应版本载荷；交付前应匿名验证提示词所指执行说明、公开引导文件与附件均可获取，并在移除 Codex/Git PATH 的隔离环境中验证引导工具的安装与初始化。最终还需从 README 提示词开始，在真实桌面环境验收页面打开与项目接入。日常发布不移动旧标签或覆盖旧附件来伪装新版本。本仓库的后续版本发布仍需维护者授权。
+### 准备与发布一个新版本
+
+1. 同步插件版本、引导工具和安装提示词中的固定标签，提交并推送，确认 main 的 CI 通过。新版本使用新的标签，不能重复发布当前 `.45` 或替换旧附件。
+2. 在 Actions 中选择 main，手动运行 `prepare-release.yml`，输入 `v` 前缀的版本标签。标签须与该次运行提交中的插件版本一致。流程重新执行完整检查，两种 Python 环境均通过后，使用 Python 3.13 检查过的候选字节创建新标签及草稿，上传三个附件。已存在的标签、Release 或草稿会让流程停止，不覆盖已有内容。
+3. 使用草稿中的同一份 ZIP 在 Windows 版 Codex 桌面端验收安装、页面打开和真实项目记录送达；安装与初始化还应检查移除 Codex/Git PATH 后的隔离场景。不要把测试夹具或隔离阅读器成功当作真实 Hook 投递证据。
+4. 确认版本说明、附件和桌面验收结果后，由维护者在 GitHub Release 页面点击发布。Alpha 版本保留预发布标记。流程不会替维护者发布，也不修改首页推荐版本。
+5. 检查 `verify-release.yml` 的结果：固定标签的安装说明与引导脚本、ZIP、SHA256 文件和清单必须可匿名获取，且版本和摘要一致。发布后再从面向用户的安装提示词检查完整接入体验。
+
+目前入口测试要求 README、安装指南与源码版本同步。下一次修改版本时，应将公开安装链接的切换安排在发布窗口内：仅有草稿时，新版本附件还不能匿名下载。准备草稿工作流本身不会改写 README，也没有独立的“稳定版本入口”切换机制；不要让首页长期指向尚未发布的版本。
+
+下载验证订阅 GitHub 的 `release.published`，覆盖正式版以及从草稿发布的预发布版本。若需要重查，可手动运行并填写同一已发布标签；如果以后改为其他自动化通过 `GITHUB_TOKEN` 发布，也应显式触发验证，因为这种令牌产生的事件通常不会触发后续工作流。参见 GitHub 的[发布事件说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release)和[工作流触发规则](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow)。
+
+下载验证只读取公开文件，不执行下载的安装器、不安装或更新插件、不启用项目，不上传记录。验证失败时先保留具体失败信息，检查链接、附件与摘要；不要通过移动旧标签或覆盖旧附件掩盖问题。对已发布版本的修复仍应按授权范围交付新版本。引导工具只接受对应版本载荷，后续版本发布仍需维护者授权。
+
+如果准备草稿流程在创建标签后失败，可能留下标签或不完整的草稿。先检查运行记录和远端状态；流程不会自动删除这些内容，也不会在重试时补传或替换已有附件。维护者确认清理范围后再处理，不能把部分成功当作可发布状态。
 
 现有 .45 安装附件早于主分支新增 MIT 文件，其 ZIP、摘要与清单保留发布时的字节，`license_pending=true` 记录当时构建状态。公开历史清理保留版本标签名及安装所需的执行说明、引导脚本；清理后的标签指向经过整理的源码提交，附件清单仍保留原始构建来源，不能把该附件称为从清理后提交重新构建。已有安装不受源码文档清理影响。
+
+手动下载验证也要求清单中的来源提交与公开标签一致；只有上述 `.45` 已知的两个完整提交 SHA 被明确列为历史例外，其他版本或其他 SHA 组合不会放行。发布事件触发的验证还会核对事件对应的提交，不能用手动运行绕过来源检查。
 
 后续从含 LICENSE 的源码构建时，`license_pending` 自动变为 `false`，`publish_ready` 仍为 `false`，真实宿主验收仍单独记录。许可证已选定不等于旧安装附件被重新打包，也不自动构成正式发布就绪证明。当前操作入口以主分支 README 和安装指南为准。
 

@@ -1,8 +1,16 @@
 name: Alpha candidate checks
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-candidate:
+        description: Build a clean, licensed candidate and retain tested bytes for a release draft
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,6 +31,9 @@ jobs:
       PYTHONUTF8: '1'
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
+      - name: Preserve repository bytes for fixed-tag download comparisons
+        run: git config --global core.autocrlf false
+
       - name: Check out source without stored credentials
         uses: actions/checkout@v4
         with:
@@ -58,11 +69,20 @@ jobs:
           node --test @taskTests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      # A candidate can be built while licensing or real-host acceptance is
-      # pending. Do not pass --for-release or infer permission to publish.
-      - name: Build a local candidate
+      - name: Test release tooling without network or publication
         run: |
-          python tools/build_alpha.py --output-dir "$env:BLACKBOX_CANDIDATE_DIR"
+          python -m unittest discover -s tools/tests -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # --for-release only checks source cleanliness and licensing. It never
+      # attests real-host acceptance or grants permission to publish.
+      - name: Build a local candidate
+        env:
+          BLACKBOX_RELEASE_CANDIDATE: ${{ inputs.release-candidate || false }}
+        run: |
+          $taskBuildArgs = @('tools/build_alpha.py', '--output-dir', $env:BLACKBOX_CANDIDATE_DIR)
+          if ($env:BLACKBOX_RELEASE_CANDIDATE -eq 'true') { $taskBuildArgs += '--for-release' }
+          python @taskBuildArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify archive and smoke-test the isolated reader
@@ -113,3 +133,13 @@ jobs:
       - name: Record the boundary of this CI check
         run: |
           'Offline candidate and isolated reader checks only. No product installation, real Codex capture, upload, or publication was performed.'
+
+      # Preserve exactly the package tested above; the draft job must not rebuild.
+      - name: Retain tested release candidate
+        if: ${{ inputs.release-candidate && matrix.python == '3.13' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackbox-release-candidate
+          path: ${{ env.BLACKBOX_CANDIDATE_DIR }}/*
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,87 @@
+name: Prepare release draft
+
+# Creating a draft is an explicit maintainer action, never a push side effect.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: New tag matching plugin.json (for example v0.4.0-alpha.6.46)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blackbox-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: ${{ github.repository == 'zemekeznb/blackbox-plugin' && github.ref == 'refs/heads/main' }}
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Preserve repository bytes
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check requested version and exact source commit
+        shell: pwsh
+        env:
+          BLACKBOX_RELEASE_TAG: ${{ inputs.tag }}
+          BLACKBOX_RELEASE_COMMIT: ${{ github.sha }}
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUTF8: '1'
+        run: |
+          python tools/prepare_release.py check --local-only --tag "$env:BLACKBOX_RELEASE_TAG" --commit "$env:BLACKBOX_RELEASE_COMMIT"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  candidate:
+    needs: preflight
+    uses: ./.github/workflows/alpha.yml
+    with:
+      release-candidate: true
+    permissions:
+      contents: read
+
+  draft:
+    needs: [preflight, candidate]
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Preserve the tested repository bytes
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          name: blackbox-release-candidate
+          path: ${{ runner.temp }}/blackbox-release-candidate
+      - name: Create a new draft without replacing any version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BLACKBOX_RELEASE_TAG: ${{ inputs.tag }}
+          BLACKBOX_RELEASE_COMMIT: ${{ github.sha }}
+          BLACKBOX_RELEASE_ARTIFACTS: ${{ runner.temp }}/blackbox-release-candidate
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUTF8: '1'
+        run: |
+          python tools/prepare_release.py create-draft --tag "$env:BLACKBOX_RELEASE_TAG" --commit "$env:BLACKBOX_RELEASE_COMMIT" --artifacts "$env:BLACKBOX_RELEASE_ARTIFACTS"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          'Release draft created. Real Codex desktop acceptance and manual publication are still required.' >> $env:GITHUB_STEP_SUMMARY

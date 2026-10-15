@@ -1,0 +1,52 @@
+name: Verify published downloads
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published tag to verify anonymously (for example v0.4.0-alpha.6.45)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  downloads:
+    if: ${{ github.repository == 'zemekeznb/blackbox-plugin' }}
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      # The existing .45 tag predates this verifier. Read current maintainer code;
+      # downloaded package/bootstrap bytes are inspected, never executed.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify public installation entrypoints and all three assets
+        shell: pwsh
+        env:
+          BLACKBOX_RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          BLACKBOX_EXPECTED_COMMIT: ${{ github.event_name == 'release' && github.sha || '' }}
+          BLACKBOX_VERIFY_REPORT: ${{ runner.temp }}/blackbox-download-verification.json
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUTF8: '1'
+        run: |
+          $taskVerifyArgs = @('tools/verify_release_downloads.py', '--tag', $env:BLACKBOX_RELEASE_TAG, '--output', $env:BLACKBOX_VERIFY_REPORT)
+          if ($env:BLACKBOX_EXPECTED_COMMIT) { $taskVerifyArgs += @('--expected-commit', $env:BLACKBOX_EXPECTED_COMMIT) }
+          python @taskVerifyArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          'Anonymous download and integrity verification passed. No installation, project capture, or update was performed.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Retain download verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackbox-download-verification
+          path: ${{ runner.temp }}/blackbox-download-verification.json
+          if-no-files-found: ignore
+          retention-days: 14
