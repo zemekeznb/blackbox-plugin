@@ -12,7 +12,7 @@ The installation entry below stays on the published version that has passed down
 
 ## Install through Codex
 
-You need Windows, an installed and running Codex desktop app, Python **3.11 or later** available to Codex as `python`, and access to GitHub. You do not need Git, a GitHub login, or a separately installed Codex CLI. Terminal CLI conversations are excluded from recording.
+You need Windows, an installed and running Codex desktop app, an existing Python **3.11 or later** runtime (including the runtime provided by Codex; no system PATH change is required), and access to GitHub. You do not need Git, a GitHub login, or a separately installed Codex CLI. Terminal CLI conversations are excluded from recording.
 
 Send this message in a **Codex desktop conversation**:
 
@@ -24,7 +24,7 @@ Please install and initialize Blackbox by following https://github.com/zemekeznb
 
 The linked execution instructions are in Chinese and are intended for Codex to follow. Codex checks prerequisites, downloads and verifies the fixed release package, registers the plugin, initializes its local runtime, and tries to open Blackbox. You do not need to download or extract the package yourself. Registration, runtime initialization, the native entry, and opening a local web page must be reported separately.
 
-**Known issue in .45:** The official plugin declares a sidebar entry, but its desktop page service depends on a working `python` command. An installation conversation can temporarily use another Python to open a local web page while the desktop backend still fails to start the service. The runtime-binding fix is not yet released; the links above still download the original .45 package.
+**Installation validation:** .46 includes the host runtime-binding fix and starts the backend with a verified absolute Python path, without relying on Python in PATH. Sidebar discovery, restart and new-conversation behavior still need validation on a clean computer. Opening a web page alone does not verify the native entry. Keep access-denied errors for diagnosis; do not repeatedly reinstall or switch data directories.
 
 If the plugin has not loaded, ask Codex to inspect the official `blackbox@personal` plugin's `blackbox_reader` startup status and error. Refresh or start a new conversation if that is the remaining step. If a full reload is needed, save your work, fully quit and reopen Codex, then send:
 

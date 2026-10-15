@@ -32,7 +32,7 @@ Review execution errors, saved command results and follow-up calls by project an
 ## Quick start
 
 <!-- blackbox:published:start -->
-The current version is **0.4.0-alpha.6.46**. You need **Windows, the Codex desktop app, Python 3.11+ available to Codex as `python`**, and access to GitHub. Git, a GitHub login and a separate Codex CLI installation are not required.
+The current version is **0.4.0-alpha.6.46**. You need **Windows, the Codex desktop app, an existing Python 3.11+ runtime (the runtime provided by Codex is supported)**, and access to GitHub. Git, a GitHub login and a separate Codex CLI installation are not required.
 <!-- blackbox:published:end -->
 
 This entry point stays on the published version that has passed download verification.
@@ -47,7 +47,7 @@ Please install and initialize Blackbox by following https://github.com/zemekeznb
 
 Codex checks dependencies, downloads and verifies the plugin, installs it, initializes the local runtime, and reports native entry and page-opening results separately. **Installation does not enable project recording.** See the [user guide](docs/en/README.md) for troubleshooting. The installation instructions read by Codex and the current interface are in Chinese.
 
-**Known issue in .45:** A desktop backend without a working Python command can show the plugin as installed while its sidebar entry is missing. Finding Python temporarily in a conversation or opening the local web page does not verify the native entry. The runtime-binding fix is not yet released. Keep the specific error; do not repeatedly reinstall or switch data directories.
+**Installation validation:** .46 includes the host runtime-binding fix and starts the backend with a verified absolute Python path, without relying on Python in PATH. Sidebar discovery, restart and new-conversation behavior still need validation on a clean computer. Opening a web page alone does not verify the native entry. Keep access-denied errors for diagnosis; do not repeatedly reinstall or switch data directories.
 
 ## What it helps with
 
