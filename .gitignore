@@ -9,3 +9,14 @@ dist/
 build/
 
 .migration/
+
+# Private development history: retained locally, excluded from new public commits.
+/docs/tasks/
+/docs/reports/
+/docs/history/
+/docs/evidence/
+/docs/design/
+/docs/export-notes.md
+/docs/integration-evidence.md
+/docs/technology.md
+/tools/cleanup_notes025.py

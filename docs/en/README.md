@@ -26,11 +26,14 @@ Continue Blackbox's initial setup and open its interface. Do not enable recordin
 
 Installation does not enable new projects or grant Hook trust. Updating preserves existing project settings.
 
-## Connect your first project
+## Connect a project
 
-1. In Blackbox, select **接入第一个项目** (“Connect your first project”).
-2. Review the project and the data to be saved. Copy the prompt provided by the page into that project's Codex desktop conversation. Use this page-generated prompt as the project authorization entry point.
-3. Codex helps complete the official Hook review, enables the selected project, and runs a harmless real command to check that its corresponding record arrives. If Codex needs to restart, follow the supplied steps to resume verification; a computer restart is not required.
+- **First project:** Follow the initial Blackbox screen and select **接入第一个项目** (“Connect your first project”).
+- **Additional projects:** At the bottom left, open **采集与隐私** (“Recording and privacy”) → **使用与排查** (“Usage and troubleshooting”) → expand **如何接入新项目？** (“How do I connect a new project?”).
+
+Review the project and the data to be saved. Copy the prompt provided by the relevant entry point into a **Codex desktop conversation in the target project**. This page-provided prompt is the project authorization entry point; each new project requires explicit setup.
+
+Codex helps complete the official Hook review, enables the selected project, and runs a harmless real command to check that its corresponding record arrives. If Codex needs to restart, follow the supplied steps to resume verification; a computer restart is not required.
 
 The recording scope includes visible prompts, replies, tool calls, and their results from the authorized project, which may contain project content or sensitive information. Data stays local by default. Existing authorization does not need to be given again.
 

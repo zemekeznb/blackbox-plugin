@@ -16,7 +16,7 @@ python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.45-can
 
 ## CI 与交付
 
-`.github/workflows/alpha.yml` 在 PR 和手动触发时运行 Windows/Python 3.11、3.13 的源码与解包测试；当前不在每次 main 推送时自动触发，也不发布制品。
+[`alpha.yml`](../.github/workflows/alpha.yml) 在 PR 和手动触发时运行 Windows/Python 3.11、3.13 的源码与解包测试；当前不在每次 main 推送时自动触发，也不发布制品。结果以对应提交的 [GitHub Actions 运行记录](https://github.com/zemekeznb/blackbox-plugin/actions/workflows/alpha.yml)为准。
 
 版本来源为 `plugins/blackbox/.codex-plugin/plugin.json`。构建会检查引导工具的 VERSION 和 Codex 安装说明中的固定标签是否一致；不一致时停止构建。修改版本时还需同步首页与安装指南的提示词链接，入口测试检查它们与插件版本、执行说明中的引导工具标签一致。先测试并构建试用候选，再记录验收证据；已提交且工作树干净后可重建具有明确提交来源的候选包。
 
@@ -28,7 +28,7 @@ python tools/verify_alpha_candidate.py dist/blackbox-plugin-0.4.0-alpha.6.45-can
 
 维护者先通过测试，在取得发布授权后提交代码并创建固定标签，从干净提交构建候选，将 ZIP/摘要/清单上传到同一版本 Release。引导工具只接受对应版本载荷；交付前应匿名验证提示词所指执行说明、公开引导文件与附件均可获取，并在移除 Codex/Git PATH 的隔离环境中验证引导工具的安装与初始化。最终还需从 README 提示词开始，在真实桌面环境验收页面打开与项目接入。不要移动旧标签或覆盖旧附件来伪装新版本。本仓库的后续版本发布仍需维护者授权。
 
-NOTES-138 收敛为桌面端单一对话入口；NOTES-140 在此基础上修补 CLI 准入与旧身份缓存，并获用户授权发布新的 .45 Alpha 安装包。NOTES-141 选定 MIT 许可证；现有 .45 标签及附件保持原样，其清单中的 `license_pending=true` 记录当时构建状态。后续从含 LICENSE 的源码构建时，该项自动变为 `false`，`publish_ready` 仍为 `false`，真实宿主验收仍单独记录。当前操作入口以主分支 README 和安装指南为准。
+现有 .45 标签及附件早于主分支新增 MIT 文件，保持原样，其清单中的 `license_pending=true` 记录当时构建状态。后续从含 LICENSE 的源码构建时，该项自动变为 `false`，`publish_ready` 仍为 `false`，真实宿主验收仍单独记录。许可证已选定不等于旧安装附件被重新打包，也不自动构成正式发布就绪证明。当前操作入口以主分支 README 和安装指南为准。
 
 以下旧 Git 路径集成工具仍供维护者检查宿主能力，不是客户安装入口。它在临时 CODEX_HOME 中执行真实 Codex CLI 获取/安装和缓存内首次设置，不调用模型、不改用户真实安装或信任。输出路径须为新文件：
 
@@ -40,8 +40,8 @@ python tools/verify_git_install.py --ref v0.4.0-alpha.6.43 --version 0.4.0-alpha
 
 单元测试和模拟 Hook 只验证代码路径。安装成功、Hook 已信任与真实事件收到必须分别验收；不能用离线测试替代新用户安装、Codex 重载、真实命令投递和界面体验。已知限制见 [当前状态](current-status.md)。
 
-修改按 [AGENTS.md](../AGENTS.md) 和 `docs/tasks/` 执行，运行数据留在仓库外。报告问题时提供版本、步骤和脱敏后的现象，不直接上传完整数据库或凭据。
+修改按 [AGENTS.md](../AGENTS.md) 执行，运行数据留在仓库外。报告问题时提供版本、步骤和脱敏后的现象，不直接上传完整数据库或凭据。
 
 ## 维护文档
 
-[当前状态](current-status.md)记录当前事实和未验收项，[开发计划](development-plan.md)记录后续工作，[架构](architecture.md)说明实现边界。历史版本和失败证据留在 tasks、reports 与 history 中，不重新作为当前安装指引。
+[当前状态](current-status.md)记录当前事实和未验收项，[开发计划](development-plan.md)记录后续工作，[架构](architecture.md)说明实现边界，[关键决策](decisions/)记录长期取舍与兼容约定。内部任务、原始验收材料和个人环境记录不随公共文档发布；公开结论须能通过源码、可复现命令或对应提交的 CI 结果核对。

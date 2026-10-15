@@ -23,6 +23,10 @@
 
 Review execution errors, saved command results and follow-up calls by project and session. Export Markdown snapshots with their source evidence. Records stay on your computer by default, and recording starts only for projects you explicitly enable.
 
+![Blackbox overview: projects, sessions, execution errors, commands and saved results](docs/images/overview.png)
+
+*Current interface screenshots, with the host app border cropped and local usernames and paths obscured.*
+
 ## Quick start
 
 The current version is **0.4.0-alpha.6.45**. You need **Windows, the Codex desktop app, Python 3.11+ available to Codex as `python`**, and access to GitHub. Git, a GitHub login and a separate Codex CLI installation are not required.
@@ -45,14 +49,6 @@ Codex checks dependencies, downloads and verifies the plugin, installs it, initi
 | Filters and Markdown export | Narrow records by time or type and save a snapshot you can choose to share |
 | Local management | Enable or disable recording per project; back up, restore and clean up records |
 
-## Connect your first project
-
-1. In Blackbox, click **接入第一个项目** (Connect your first project).
-2. Read the recording scope and send the provided prompt to a Codex desktop conversation in the target project.
-3. Codex sets up the project, helps with the official Hook trust review and runs a harmless real command to check that its record arrives. Follow any restart and follow-up instructions.
-
-**Project setup is complete only when the corresponding real record is received.** Then continue working in Codex as usual.
-
 ## Review and export
 
 When you want to review records, send this in a Codex desktop conversation:
@@ -62,6 +58,19 @@ Open Blackbox.
 ```
 
 Choose a project, session and error to inspect saved commands, results and associated follow-up calls. Filter records and export a Markdown snapshot when needed.
+
+![Blackbox export preview: review the full Markdown content before saving to Downloads](docs/images/export-preview.png)
+
+## Connect a project
+
+- **First project:** Follow the initial Blackbox screen and click **接入第一个项目** (Connect your first project).
+- **Additional projects:** At the bottom left, open **采集与隐私** (Recording and privacy) → **使用与排查** (Usage and troubleshooting) → expand **如何接入新项目？** (How do I connect a new project?) to find the setup prompt.
+
+Read the recording scope in the prompt, then copy and send it to a **Codex desktop conversation in the target project**. Codex sets up the project, helps with the official Hook trust review and runs a harmless real command to check that its record arrives. Follow any restart and follow-up instructions.
+
+**Project setup is complete only when the corresponding real record is received.** Each new project requires explicit setup; then continue working in that project as usual.
+
+![Blackbox project setup: Recording and privacy, Usage and troubleshooting, and the new-project prompt](docs/images/connect-project.png)
 
 ## Data and supported scope
 
