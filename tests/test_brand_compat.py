@@ -15,7 +15,7 @@ class BrandCompatibilityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='blackbox-brand-')
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         self.old = self.base / 'TAS Notes'
         self.new = self.base / 'Blackbox'
         env = dict(os.environ, LOCALAPPDATA=str(self.base))

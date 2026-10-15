@@ -23,7 +23,7 @@ class PreflightTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='blackbox-preflight-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.state = self.root / 'state'
         self.path_patch = patch.object(preflight, 'inspect_path_python', return_value={
             'executable': sys.executable, 'version': list(sys.version_info[:3])})

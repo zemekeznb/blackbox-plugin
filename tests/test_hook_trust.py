@@ -41,7 +41,7 @@ class TrustTests(unittest.TestCase):
     def test_status_blocks_waiting_and_preserves_project_authorization(self):
         from blackbox_core import Store
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp); project = root / 'project'; project.mkdir()
+            root = Path(tmp).resolve(); project = root / 'project'; project.mkdir()
             store = Store(root / 'state'); store.set_project(str(project), True)
             (store.directory / 'runtime.cmd').write_text('@"' + sys.executable + '" %*\n', encoding='ascii')
             with patch('blackbox_hooks.inspect', return_value={str(project): 'hooks_untrusted'}):

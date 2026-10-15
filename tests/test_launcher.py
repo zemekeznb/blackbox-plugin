@@ -28,7 +28,7 @@ class LauncherTests(unittest.TestCase):
 
     def test_existing_database_resolves_file_overlay_before_directory(self):
         with tempfile.TemporaryDirectory(prefix='notes-overlay-test-') as root:
-            logical, physical = Path(root) / 'logical', Path(root) / 'physical'
+            logical, physical = Path(root).resolve() / 'logical', Path(root).resolve() / 'physical'
             logical.mkdir(); physical.mkdir()
             (logical / 'notes.sqlite3').write_bytes(b'placeholder')
             with patch('blackbox_launcher.physical_file_path', return_value=str(physical / 'notes.sqlite3')) as file_path, \

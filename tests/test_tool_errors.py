@@ -23,7 +23,7 @@ class ToolErrorTests(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory(prefix='blackbox-tool-errors-')
         self.addCleanup(tmp.cleanup)
-        self.root = Path(tmp.name)
+        self.root = Path(tmp.name).resolve()
         self.project = self.root / 'project'; self.project.mkdir()
         self.store = Store(self.root / 'state')
         self.store.set_project(str(self.project), True)

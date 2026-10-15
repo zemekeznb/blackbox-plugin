@@ -23,7 +23,7 @@ class AlphaCaptureTests(unittest.TestCase):
         self.addCleanup(trust.stop)
         self.temporary = tempfile.TemporaryDirectory(prefix='blackbox-alpha-capture-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.project = self.root / 'project'
         self.project.mkdir()
         self.state = self.root / 'state'
