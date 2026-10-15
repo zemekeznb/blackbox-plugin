@@ -45,6 +45,24 @@ class AlphaPackageTests(unittest.TestCase):
     def build(self, **kwargs):
         return alpha.build(self.root, Path(self.temp.name) / 'output', **kwargs)
 
+    def test_distribution_contains_manifest_branding_assets(self):
+        source = Path(__file__).resolve().parents[1]
+        metadata_path = alpha.PLUGIN + '.codex-plugin/plugin.json'
+        metadata_bytes = (source / metadata_path).read_bytes()
+        metadata = json.loads(metadata_bytes)
+        self.put(metadata_path, json.dumps({**metadata, 'version': '0.4.0-alpha.1'}).encode())
+        expected = {}
+        for field in ('logo', 'composerIcon'):
+            relative = metadata['interface'][field]
+            self.assertTrue(relative.startswith('./assets/'))
+            name = alpha.PLUGIN + relative[2:]
+            expected[name] = (source / name).read_bytes()
+            self.put(name, expected[name])
+        result = self.build()
+        with zipfile.ZipFile(result['archive']) as bundle:
+            for name, content in expected.items():
+                self.assertEqual(bundle.read(name), content)
+
     def test_deterministic_zip_hashes_and_version(self):
         first = self.build()
         first_bytes = Path(first['archive']).read_bytes()

@@ -20,7 +20,9 @@
     "capabilities": [
       "Interactive"
     ],
-    "defaultPrompt": "Open my local Blackbox Plugin records for review."
+    "defaultPrompt": "Open my local Blackbox Plugin records for review.",
+    "logo": "./assets/blackbox-mark.svg",
+    "composerIcon": "./assets/blackbox-mark.svg"
   },
   "mcpServers": "./.mcp.json"
 }

@@ -31,7 +31,7 @@ SCRIPT_NAMES = (
     'blackbox_summary.py', 'blackbox_transport_errors.py', 'blackbox_web.py', 'blackbox_install.py', 'blackbox_compat.py',
     'launch.cmd', 'launch-legacy.cmd', 'mcp.cmd', 'blackbox_runtime.py', 'blackbox_runtime.ps1', 'install_shortcuts.ps1',
 )
-ASSET_NAMES = ('anomalies.html', 'anomalies.js', 'mcp-reader.js', 'review.css',
+ASSET_NAMES = ('blackbox-mark.svg', 'anomalies.html', 'anomalies.js', 'mcp-reader.js', 'review.css',
                'review.html', 'review.js')
 TEST_HELPERS = (
     'tools/build_alpha.py', 'tools/verify_alpha_candidate.py', 'tools/verify_windows_install.py', 'tools/verify_install_flow.py', 'tools/verify_brand_migration.py', 'tools/verify_git_install.py', 'tools/bootstrap_blackbox.py',
