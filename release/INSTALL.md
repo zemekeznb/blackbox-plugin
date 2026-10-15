@@ -1,15 +1,15 @@
 # 安装与项目接入
 
-候选源码版本 **0.4.0-alpha.6.46**，本轮仅面向 **Windows 版 Codex 桌面端**。需要已安装并打开的 Codex、现有 Python 3.11+ 与 GitHub 网络；可使用 Codex 已提供的 Python 绝对路径，无需更改系统 PATH。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集。
+候选源码版本 **0.4.0-alpha.6.47**，本轮仅面向 **Windows 版 Codex 桌面端**。需要已安装并打开的 Codex、现有 Python 3.11+ 与 GitHub 网络；可使用 Codex 已提供的 Python 绝对路径，无需更改系统 PATH。无需 Git、GitHub 登录或单独安装 Codex CLI；终端 CLI 会话不采集。
 
-本页随源码候选包维护。运行绑定修复包含在 .46 候选中，公开 .45 安装包不含该修复。下方固定标签提示词用于 .46 公开发布后；草稿阶段请按[候选安装测试指南](https://github.com/zemekeznb/blackbox-plugin/blob/main/docs/TEST-CANDIDATE.md)使用下载的附件，不运行公开下载引导。当前普通用户入口仍见[公开安装指南](https://github.com/zemekeznb/blackbox-plugin/blob/main/docs/INSTALL.md)。
+本版包含插件列表 Logo 与输入框图标；沿用 .46 的宿主运行绑定修复。固定标签安装入口在本版公开发布后可用。已发布旧版本附件保持不变。
 
 ## 1. 交给 Codex 安装
 
 在 **Codex 桌面会话**中复制发送：
 
 ```text
-请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.46/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
+请按 https://github.com/zemekeznb/blackbox-plugin/blob/v0.4.0-alpha.6.47/release/INSTALL-CODEX.md 为我安装并初始化 Blackbox，然后打开界面。暂不启用任何项目采集，不修改模型、账号或系统环境配置。
 ```
 
 Codex 会读取对应版本的执行说明、检查依赖、下载并校验插件包，完成安装与本地初始化，再打开 Blackbox。候选修复把实际 Python 和物理状态目录保存在当前 Codex 的运行绑定中，供后续会话、MCP 与 Hook 共用。无需修改系统 PATH。插件登记、运行绑定、原生入口与本地网页打开分别报告；任一步失败都保留具体阻断。
