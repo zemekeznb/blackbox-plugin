@@ -41,17 +41,13 @@ The recording scope includes visible prompts, replies, tool calls, and their res
 
 ## Review and export
 
-Continue working normally in the connected project's Codex desktop conversations. To review records, send:
+After installation and initialization, find and click **Blackbox** in the **Codex desktop sidebar** to open your records. Alternatively, send “Open Blackbox.” in a Codex desktop conversation and ask Codex to open it for you.
 
-```text
-Open Blackbox.
-```
-
-Select a project and conversation, filter by time or error type, and open an error record to inspect its saved command, result, and associated follow-up calls. The page identifies supported error formats; it does not determine root cause, responsibility, or whether a later call fixed the problem.
+Continue working normally in the connected project's Codex desktop conversations. To review records, select a project and conversation in Blackbox, filter by time or error type, and open an error record to inspect its saved command, result, and associated follow-up calls. The page identifies supported error formats; it does not determine root cause, responsibility, or whether a later call fixed the problem.
 
 Review the full Markdown preview and source fields before exporting. The export is a snapshot of a fixed scope and is not uploaded automatically. Check it for sensitive information before sharing.
 
-In the Codex side panel, **保存到下载文件夹** (“Save to Downloads”) writes the previewed and verified content to your Windows Downloads folder. Existing filenames receive a numbered suffix. The local browser reading page uses the browser's download mechanism. Use the full path in the success message; after a timeout, check the destination before saving again.
+On the Blackbox page within Codex, **保存到下载文件夹** (“Save to Downloads”) writes the previewed and verified content to your Windows Downloads folder. Existing filenames receive a numbered suffix. The local browser reading page uses the browser's download mechanism. Use the full path in the success message; after a timeout, check the destination before saving again.
 
 Records that the official host lookup explicitly reports as unlinked are hidden from everyday navigation. This does not automatically delete their stored history, mean they were archived, or establish that they came from a subagent. A temporary name lookup failure is not a reason to delete a record.
 
@@ -103,7 +99,7 @@ Release .45 rechecks old conversation identity caches. Events whose identity can
 
 | Link | Contents |
 | --- | --- |
-| [Chinese installation guide](../../release/INSTALL.md) | Installation, first project, troubleshooting, updates, and removal |
+| [Chinese installation guide](../../release/INSTALL.md) | Installation, project setup, troubleshooting, updates, and removal |
 | [Chinese usage and privacy guide](../../release/ALPHA-GUIDE.md) | Local records, exports, backup, restore, and limitations |
 | [Instructions for Codex](../../release/INSTALL-CODEX.md) (Chinese) | The installation procedure followed by the assistant |
 | [Development and validation](../DEVELOPMENT.md) (Chinese) | Tests, packaging, CI, and release procedures |

@@ -51,13 +51,11 @@ Codex checks dependencies, downloads and verifies the plugin, installs it, initi
 
 ## Review and export
 
-When you want to review records, send this in a Codex desktop conversation:
-
-```text
-Open Blackbox.
-```
+After installation and initialization, find and click **Blackbox** in the **Codex desktop sidebar** to open your records.
 
 Choose a project, session and error to inspect saved commands, results and associated follow-up calls. Filter records and export a Markdown snapshot when needed.
+
+Alternatively, send “Open Blackbox.” in a Codex desktop conversation and ask Codex to open it for you.
 
 ![Blackbox export preview: review the full Markdown content before saving to Downloads](docs/images/export-preview.png)
 
@@ -85,11 +83,11 @@ Read the recording scope in the prompt, then copy and send it to a **Codex deskt
 | Document | Contents |
 | --- | --- |
 | [English guide](docs/en/README.md) | Installation, project setup, usage, privacy, troubleshooting and uninstalling |
-| [安装指南 / Installation](release/INSTALL.md) (中文) | Conversational installation, first project, updates and troubleshooting |
+| [安装指南 / Installation](release/INSTALL.md) (中文) | Conversational installation, project setup, updates and troubleshooting |
 | [使用与隐私 / Usage and privacy](release/ALPHA-GUIDE.md) (中文) | Recording scope, backups, exports and limitations |
 | [Development and releases](docs/DEVELOPMENT.md) (中文) | Local tests, candidate builds, CI and version delivery |
 | [Architecture and boundaries](docs/architecture.md) (中文) | Session admission, storage, error recognition and data management |
-| [Current status](docs/current-status.md) · [Development plan](docs/development-plan.md) (中文) | Verified scope, pending checks and deferred work |
+| [Current status](docs/current-status.md) · [Development plan](docs/development-plan.md) (中文) | Verified scope, pending checks and future directions |
 | [Releases](https://github.com/zemekeznb/blackbox-plugin/releases) · [Issues](https://github.com/zemekeznb/blackbox-plugin/issues) | Published packages, updates and issue tracking |
 
 ## Feedback
