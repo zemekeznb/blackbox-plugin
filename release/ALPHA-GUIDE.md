@@ -4,7 +4,7 @@ Blackbox 面向 Windows 版 Codex 桌面端，为明确启用的项目保存宿�
 
 ## 使用前了解
 
-- 需要 Windows 版 Codex 桌面端与 Python 3.11+。.46 已发布运行绑定修复，后台使用已核实的 Python 绝对路径，不依赖系统 Python PATH；真实干净电脑验收仍待完成。Codex CLI、Linux/macOS 及其他 Agent 宿主尚未完成产品适配；最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
+- 需要 Windows 版 Codex 桌面端与 Python 3.11+。.46 已发布运行绑定修复，后台使用已核实的 Python 绝对路径，不依赖系统 Python PATH；用户已反馈 .46 在另一台干净电脑通过安装、侧边栏、重启、新会话和真实异常采集测试，结论限于该环境。Codex CLI、Linux/macOS 及其他 Agent 宿主尚未完成产品适配；最低 Codex 版本及 API Key 登录模式尚未完成专项验收。
 - 项目采用 [MIT 许可证](../LICENSE)，仍处于 Alpha 试用阶段；第三方字体保留其[原有许可声明](../plugins/blackbox/assets/review.css)。
 - 插件登记、运行初始化、原生入口可用、本地网页打开、启用项目、Hook 已信任与真实记录收到是不同状态。只有实际核验命令记录送达，才算完成该项目的接入。
 

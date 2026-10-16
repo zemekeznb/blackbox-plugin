@@ -47,7 +47,7 @@ Please install and initialize Blackbox by following https://github.com/zemekeznb
 
 Codex checks dependencies, downloads and verifies the plugin, installs it, initializes the local runtime, and reports native entry and page-opening results separately. **Installation does not enable project recording.** See the [user guide](docs/en/README.md) for troubleshooting. The installation instructions read by Codex and the current interface are in Chinese.
 
-**Installation validation:** .46 includes the host runtime-binding fix and starts the backend with a verified absolute Python path, without relying on Python in PATH. Sidebar discovery, restart and new-conversation behavior still need validation on a clean computer. Opening a web page alone does not verify the native entry. Keep access-denied errors for diagnosis; do not repeatedly reinstall or switch data directories.
+**Installation validation:** .46 includes the host runtime-binding fix and starts the backend with a verified absolute Python path, without relying on Python in PATH. The user reports that .46 passed GitHub installation, sidebar, full restart, new-conversation and real-error recording checks on a separate clean Windows computer. This result is limited to that tested environment. Keep access-denied errors for diagnosis; do not repeatedly reinstall or switch data directories.
 
 ## What it helps with
 
@@ -79,6 +79,20 @@ Read the recording scope in the prompt, then copy and send it to a **Codex deskt
 **Project setup is complete only when the corresponding real record is received.** Each new project requires explicit setup; then continue working in that project as usual.
 
 ![Blackbox project setup: Recording and privacy, Usage and troubleshooting, and the new-project prompt](docs/images/connect-project.png)
+
+### Trust Hooks manually
+
+If first-time project setup reports that Hooks are not trusted, you can complete this step in Codex:
+
+1. Open **Customize → Plugins → Blackbox Plugin** and find **钩子** (Hooks).
+2. Click **检查** (Inspect) to review the Hooks. Once you confirm that every listed entry belongs to the official Blackbox plugin and matches the local recording scope you agreed to, click **全部信任** (Trust all).
+3. Return to the target project's setup conversation and continue checking that a real record arrives. Skip this step if the Hooks are already trusted.
+
+**Trusting Hooks does not enable project recording.** Explicitly connect the target project and verify receipt of its corresponding real record.
+
+![Blackbox Hooks in Codex, showing the Trust all and Inspect buttons](docs/images/hook-trust.png)
+
+*Real Codex screenshot supplied by the user, cropped to the relevant area. It shows the state before trust; the number of Hooks may vary by version.*
 
 ## Data and supported scope
 

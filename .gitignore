@@ -23,3 +23,6 @@ build/
 /docs/current-status.md
 /docs/development-plan.md
 /docs/decisions/
+
+# Machine-local Codex launch actions.
+/.codex/environments/
